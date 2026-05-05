@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser'
 import * as C from '../constants'
-import type { Game } from '../scenes/Game'
 import type { Spawner, TilePos } from '../maze'
-import { canMove, wrapX, wrapY } from '../utils'
 import { GHOST_COLORS } from '../mazeConfig'
+import type { Game } from '../scenes/Game'
+import { canMove, wrapX, wrapY } from '../utils'
 
 const { CHASE, SCARED, EATEN, EXITING, JAILED } = C.GHOST_STATE
 
@@ -25,6 +25,7 @@ export class GhostSprite {
   exitDelay: number
 
   private colorIndex: number
+  private aiType: 1 | 2 | 3 | 4
   private jailPos!: TilePos
   private exitTile!: TilePos
   private cols!: number
@@ -45,6 +46,7 @@ export class GhostSprite {
     this.dir = 2
     this.exitDelay = colorIndex * 500
     this.colorIndex = colorIndex
+    this.aiType = ((colorIndex % 4) + 1) as 1 | 2 | 3 | 4
     this.state = EXITING
     const px = this.tileX * C.CELL + C.CELL / 2
     const py = this.tileY * C.CELL + C.CELL / 2
@@ -109,16 +111,90 @@ export class GhostSprite {
     }
   }
 
-  private getTarget(playerTileX: number, playerTileY: number): TilePos {
-    return this.state === EATEN
-      ? this.jailPos
-      : this.state === EXITING
-        ? this.exitTile
-        : { x: playerTileX, y: playerTileY }
+  private getScatterCorner(): TilePos {
+    // 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right
+    const corner = this.colorIndex % 4
+    const cx = corner === 1 || corner === 3 ? this.cols - 1 : 0
+    const cy = corner === 2 || corner === 3 ? this.rows - 1 : 0
+
+    // BFS outward from corner to find the nearest walkable tile
+    type Node = { x: number; y: number }
+    const visited = new Set<string>()
+    const queue: Node[] = [{ x: cx, y: cy }]
+    visited.add(`${cx},${cy}`)
+    while (queue.length > 0) {
+      const { x, y } = queue.shift()!
+      if (this.grid[y][x] !== C.TILES.WALL) return { x, y }
+      for (let dir = 0; dir < 4; dir++) {
+        const nx = x + C.DX[dir]
+        const ny = y + C.DY[dir]
+        if (nx < 0 || nx >= this.cols || ny < 0 || ny >= this.rows) continue
+        const key = `${nx},${ny}`
+        if (!visited.has(key)) {
+          visited.add(key)
+          queue.push({ x: nx, y: ny })
+        }
+      }
+    }
+    return { x: cx, y: cy }
   }
 
-  private chooseDir(playerTileX: number, playerTileY: number): number {
-    const target = this.getTarget(playerTileX, playerTileY)
+  private getTarget(
+    playerTileX: number,
+    playerTileY: number,
+    playerDir: number,
+    blinkyPos: TilePos,
+    inScatter: boolean,
+  ): TilePos {
+    if (this.state === EATEN) return this.jailPos
+    if (this.state === EXITING) return this.exitTile
+
+    if (inScatter) return this.getScatterCorner()
+
+    if (this.aiType === 4) {
+      // Also scatter when player is within 8 tiles
+      const dist =
+        Math.abs(this.tileX - playerTileX) + Math.abs(this.tileY - playerTileY)
+      if (dist <= 8) return this.getScatterCorner()
+      return { x: playerTileX, y: playerTileY }
+    }
+
+    if (this.aiType === 2) {
+      // 3 tiles ahead of player
+      return {
+        x: wrapX(playerTileX + C.DX[playerDir] * 3, this.cols),
+        y: wrapY(playerTileY + C.DY[playerDir] * 3, this.rows),
+      }
+    }
+
+    if (this.aiType === 3) {
+      // Inky: pivot = 2 tiles ahead of player, target = 2*pivot - blinky
+      const pivotX = playerTileX + C.DX[playerDir] * 2
+      const pivotY = playerTileY + C.DY[playerDir] * 2
+      return {
+        x: wrapX(2 * pivotX - blinkyPos.x, this.cols),
+        y: wrapY(2 * pivotY - blinkyPos.y, this.rows),
+      }
+    }
+
+    // aiType 1: target player exactly
+    return { x: playerTileX, y: playerTileY }
+  }
+
+  private chooseDir(
+    playerTileX: number,
+    playerTileY: number,
+    playerDir: number,
+    blinkyPos: TilePos,
+    inScatter: boolean,
+  ): number {
+    const target = this.getTarget(
+      playerTileX,
+      playerTileY,
+      playerDir,
+      blinkyPos,
+      inScatter,
+    )
     const canUseDoor = this.state === EATEN || this.state === EXITING
 
     if (this.state === SCARED) {
@@ -197,8 +273,20 @@ export class GhostSprite {
     return -1
   }
 
-  private tracePath(playerTileX: number, playerTileY: number): TilePos[] {
-    const target = this.getTarget(playerTileX, playerTileY)
+  private tracePath(
+    playerTileX: number,
+    playerTileY: number,
+    playerDir: number,
+    blinkyPos: TilePos,
+    inScatter: boolean,
+  ): TilePos[] {
+    const target = this.getTarget(
+      playerTileX,
+      playerTileY,
+      playerDir,
+      blinkyPos,
+      inScatter,
+    )
     const canUseDoor = this.state === EATEN || this.state === EXITING
 
     // BFS — reconstruct the full tile path to target
@@ -256,53 +344,115 @@ export class GhostSprite {
     return reversed.reverse()
   }
 
-  private drawDebugLine(playerTileX: number, playerTileY: number) {
+  private drawDebugLine(
+    playerTileX: number,
+    playerTileY: number,
+    playerDir: number,
+    blinkyPos: TilePos,
+    inScatter: boolean,
+  ) {
     if (!this.debugLine) return
     const [r, g, b] = GHOST_COLORS[this.colorIndex]
     const color = (r << 16) | (g << 8) | b
     // Spread 4 ghosts evenly: -3, -1, +1, +3 pixels from center
     const perpOffset = this.colorIndex * 2 - 3
-    const path = this.tracePath(playerTileX, playerTileY)
+    const target = this.getTarget(
+      playerTileX,
+      playerTileY,
+      playerDir,
+      blinkyPos,
+      inScatter,
+    )
+    const path = this.tracePath(
+      playerTileX,
+      playerTileY,
+      playerDir,
+      blinkyPos,
+      inScatter,
+    )
     this.debugLine.clear()
+    this.debugLine.lineStyle(2, color, 0.8)
+    this.debugLine.strokeRect(
+      target.x * C.CELL + 1,
+      target.y * C.CELL + 1,
+      C.CELL - 2,
+      C.CELL - 2,
+    )
     if (path.length < 2) return
     this.debugLine.lineStyle(3, color, 0.8)
-    this.debugLine.beginPath()
 
-    // Start from the ghost's current pixel position, offset perpendicularly to current dir
+    // Helper: tile → pixel center with perpendicular offset based on segment direction
+    const toPx = (tile: TilePos, segDx: number, segDy: number) => {
+      const ndx = segDx === 0 ? 0 : segDx > 0 ? 1 : -1
+      const ndy = segDy === 0 ? 0 : segDy > 0 ? 1 : -1
+      return [
+        tile.x * C.CELL + C.CELL / 2 + -ndy * perpOffset,
+        tile.y * C.CELL + C.CELL / 2 + ndx * perpOffset,
+      ]
+    }
+
+    // Walk segments; when a wrap is detected, stroke up to the edge, then resume
+    // from the matching edge on the other side.
     const startOx = C.DY[this.dir] * perpOffset
     const startOy = C.DX[this.dir] * -perpOffset
-    this.debugLine.moveTo(this.x + startOx, this.y + startOy)
+    let curX = this.x + startOx
+    let curY = this.y + startOy
 
     for (let i = 1; i < path.length; i++) {
-      // Determine direction of this segment from path[i-1] to path[i]
       const dx = path[i].x - path[i - 1].x
       const dy = path[i].y - path[i - 1].y
-      // Normalise for wrapping (values will be -cols+1..cols-1, clamp to -1..1)
-      const ndx = dx === 0 ? 0 : dx > 0 ? 1 : -1
-      const ndy = dy === 0 ? 0 : dy > 0 ? 1 : -1
-      // Perpendicular: rotate 90° (dx,dy) → (-dy, dx)
-      const ox = -ndy * perpOffset
-      const oy = ndx * perpOffset
-      const px = path[i].x * C.CELL + C.CELL / 2 + ox
-      const py = path[i].y * C.CELL + C.CELL / 2 + oy
-      this.debugLine.lineTo(px, py)
-    }
-    this.debugLine.strokePath()
+      const wraps = Math.abs(dx) > 1 || Math.abs(dy) > 1
 
-    const last = path[path.length - 1]
-    const ldx = last.x - path[path.length - 2].x
-    const ldy = last.y - path[path.length - 2].y
-    const lndx = ldx === 0 ? 0 : ldx > 0 ? 1 : -1
-    const lndy = ldy === 0 ? 0 : ldy > 0 ? 1 : -1
-    const lox = -lndy * perpOffset
-    const loy = lndx * perpOffset
-    const tx = last.x * C.CELL + C.CELL / 2 + lox
-    const ty = last.y * C.CELL + C.CELL / 2 + loy
-    this.debugLine.fillStyle(color, 0.8)
-    this.debugLine.fillRect(tx - 2, ty - 2, 4, 4)
+      // When wrapping, the tile delta sign is inverted relative to actual movement direction
+      // (e.g. moving left from x=0 lands at x=cols-1, giving dx=cols-1 which looks rightward)
+      const actualNdx = dx === 0 ? 0 : wraps ? (dx > 0 ? -1 : 1) : (dx > 0 ? 1 : -1)
+      const actualNdy = dy === 0 ? 0 : wraps ? (dy > 0 ? -1 : 1) : (dy > 0 ? 1 : -1)
+      const [nextX, nextY] = toPx(path[i], actualNdx, actualNdy)
+
+      if (wraps) {
+        const ox = -actualNdy * perpOffset
+        const oy = actualNdx * perpOffset
+        // Exit pixel: on the grid boundary in the actual movement direction
+        const exitX = dx !== 0
+          ? (actualNdx < 0 ? 0 : this.cols * C.CELL) + ox
+          : path[i - 1].x * C.CELL + C.CELL / 2 + ox
+        const exitY = dy !== 0
+          ? (actualNdy < 0 ? 0 : this.rows * C.CELL) + oy
+          : path[i - 1].y * C.CELL + C.CELL / 2 + oy
+        // Entry pixel: opposite boundary
+        const entryX = dx !== 0
+          ? (actualNdx < 0 ? this.cols * C.CELL : 0) + ox
+          : exitX
+        const entryY = dy !== 0
+          ? (actualNdy < 0 ? this.rows * C.CELL : 0) + oy
+          : exitY
+
+        this.debugLine.beginPath()
+        this.debugLine.moveTo(curX, curY)
+        this.debugLine.lineTo(exitX, exitY)
+        this.debugLine.strokePath()
+
+        curX = entryX
+        curY = entryY
+      }
+
+      this.debugLine.beginPath()
+      this.debugLine.moveTo(curX, curY)
+      this.debugLine.lineTo(nextX, nextY)
+      this.debugLine.strokePath()
+      curX = nextX
+      curY = nextY
+    }
   }
 
-  update(delta: number, playerTileX: number, playerTileY: number) {
+  update(
+    delta: number,
+    playerTileX: number,
+    playerTileY: number,
+    playerDir: number,
+    blinkyPos: TilePos,
+    inScatter: boolean,
+  ) {
     if (this.state === JAILED) {
       this.jailTimer -= delta
       if (this.jailTimer <= 0) {
@@ -372,7 +522,13 @@ export class GhostSprite {
         this.playAnim()
       }
 
-      const newDir = this.chooseDir(playerTileX, playerTileY)
+      const newDir = this.chooseDir(
+        playerTileX,
+        playerTileY,
+        playerDir,
+        blinkyPos,
+        inScatter,
+      )
       if (newDir !== -1 && newDir !== this.dir) {
         this.dir = newDir
         this.playAnim()
@@ -382,6 +538,12 @@ export class GhostSprite {
     this.x = (this.tileX + C.DX[this.dir] * this.progress) * C.CELL + C.CELL / 2
     this.y = (this.tileY + C.DY[this.dir] * this.progress) * C.CELL + C.CELL / 2
     this.sprite.setPosition(this.x, this.y)
-    this.drawDebugLine(playerTileX, playerTileY)
+    this.drawDebugLine(
+      playerTileX,
+      playerTileY,
+      playerDir,
+      blinkyPos,
+      inScatter,
+    )
   }
 }

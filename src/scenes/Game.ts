@@ -9,12 +9,17 @@ import { calcZoom } from '../utils'
 
 const { EATEN, EXITING, JAILED, SCARED } = GHOST_STATE
 
+const SCATTER_DURATION = 5000
+const CHASE_DURATION = 5000
+
 export class Game extends Scene {
   maze!: Maze
   private player!: PlayerSprite
   private ghosts!: GhostSprite[]
   private cursors!: Types.Input.Keyboard.CursorKeys
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
+  private scatterTimer = SCATTER_DURATION
+  private inScatter = true
 
   constructor() {
     super('Game')
@@ -46,8 +51,15 @@ export class Game extends Scene {
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
 
+    this.scatterTimer -= delta
+    if (this.scatterTimer <= 0) {
+      this.inScatter = !this.inScatter
+      this.scatterTimer = this.inScatter ? SCATTER_DURATION : CHASE_DURATION
+    }
+
+    const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
     for (const g of this.ghosts)
-      g.update(delta, this.player.tileX, this.player.tileY)
+      g.update(delta, this.player.tileX, this.player.tileY, this.player.dir, blinkyPos, this.inScatter)
 
     const landed = this.player.update(delta, this.cursors)
     if (landed) this.eatDot(this.player.tileX, this.player.tileY)

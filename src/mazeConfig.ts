@@ -49,7 +49,7 @@ export interface MazeConfig {
   powerCount: number
 }
 
-const S = 10
+const S = 30
 export const MAZE_CONFIG: MazeConfig = {
   cols: S,
   rows: Math.floor(S * 0.75),
@@ -58,12 +58,12 @@ export const MAZE_CONFIG: MazeConfig = {
   house: {
     col: Math.floor(S / 2),
     row: Math.floor(S / 2),
-    width: 1,
+    width: 4,
     height: 1,
   },
   wraps: { x: 2, y: 1 },
-  ghostCount: 1,
+  ghostCount: 4,
   powerCount: 0,
 }
 
-export const GHOST_COLORS: [number, number, number][] = generateGhostColors(8)
+export const GHOST_COLORS: [number, number, number][] = generateGhostColors(4)
