@@ -5,6 +5,8 @@ export const ANGLES = [0, 180, -90, 90]
 
 // player speed
 export const PLAYER_SPEED = 5
+// how far through a tile (0–1) before a queued perpendicular turn snaps early
+export const CORNER_THRESHOLD = 0.75
 
 export const DIRS = {
   RIGHT: 0,

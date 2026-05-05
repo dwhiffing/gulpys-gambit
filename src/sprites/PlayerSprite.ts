@@ -1,5 +1,13 @@
 import * as Phaser from 'phaser'
-import { ANGLES, CELL, DIRS, DX, DY, PLAYER_SPEED } from '../constants'
+import {
+  ANGLES,
+  CELL,
+  CORNER_THRESHOLD,
+  DIRS,
+  DX,
+  DY,
+  PLAYER_SPEED,
+} from '../constants'
 import type { Game } from '../scenes/Game'
 import { canMove, wrapX, wrapY } from '../utils'
 
@@ -58,6 +66,9 @@ export class PlayerSprite {
 
     if (this.moving) {
       this.progress += (PLAYER_SPEED * delta) / 1000
+
+      if (this.tryCornering(cursors)) return true
+
       if (this.progress >= 1) {
         this.progress -= 1
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
@@ -89,6 +100,38 @@ export class PlayerSprite {
     this.y = fracY * CELL + CELL / 2
     this.sprite.setPosition(this.x, this.y)
     return false
+  }
+
+  // Cornering: if the player is actively holding a perpendicular direction,
+  // that turn is valid at the destination tile, and we're past the threshold,
+  // snap to the corner early (saves the remaining progress).
+  // Does NOT trigger for buffered/queued inputs — key must be held right now.
+  private tryCornering(cursors: Phaser.Types.Input.Keyboard.CursorKeys): boolean {
+    if (this.progress < CORNER_THRESHOLD || this.progress >= 1) return false
+
+    const heldDir = cursors.right.isDown
+      ? DIRS.RIGHT
+      : cursors.left.isDown
+        ? DIRS.LEFT
+        : cursors.up.isDown
+          ? DIRS.UP
+          : cursors.down.isDown
+            ? DIRS.DOWN
+            : -1
+
+    if (heldDir === -1 || heldDir === this.dir) return false
+
+    const destX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
+    const destY = wrapY(this.tileY + DY[this.dir], this.grid.length)
+    if (!canMove(this.grid, destX, destY, heldDir, false)) return false
+
+    this.tileX = destX
+    this.tileY = destY
+    this.progress = 0
+    this.dir = heldDir
+    this.nextDir = heldDir
+    this.sprite.setAngle(ANGLES[this.dir])
+    return true
   }
 
   die() {
