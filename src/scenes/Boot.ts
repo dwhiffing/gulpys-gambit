@@ -1,4 +1,7 @@
 import { Scene } from 'phaser'
+import { CELL } from '../constants'
+import { GHOST_COLORS } from '../mazeConfig'
+import { createColoredGhostTexture } from '../utils'
 
 export class Boot extends Scene {
   constructor() {
@@ -21,9 +24,9 @@ export class Boot extends Scene {
 
   preload() {
     this.load.setPath('assets')
-    this.load.spritesheet('sprites', 'placeholders.png', {
-      frameWidth: 16,
-      frameHeight: 16,
+    this.load.spritesheet('sprites', 'placeholders-32.png', {
+      frameWidth: CELL,
+      frameHeight: CELL,
     })
   }
 
@@ -36,6 +39,7 @@ export class Boot extends Scene {
     const a = this.anims
     const def = (
       key: string,
+      textureKey: string,
       frames: number[],
       rate: number,
       loop: boolean,
@@ -43,17 +47,28 @@ export class Boot extends Scene {
       if (!a.exists(key))
         a.create({
           key,
-          frames: a.generateFrameNumbers('sprites', { frames }),
+          frames: a.generateFrameNumbers(textureKey, { frames }),
           frameRate: rate,
           repeat: loop ? -1 : 0,
         })
     }
-    def('player-move', [0, 1, 2, 1], 10, true)
-    def('player-die', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 10, false)
-    def('ghost-right', [14, 15], 6, true)
-    def('ghost-left', [16, 17], 6, true)
-    def('ghost-up', [18, 19], 6, true)
-    def('ghost-down', [20, 21], 6, true)
-    def('ghost-scared', [22, 23], 6, true)
+    def('player-move', 'sprites', [0, 1, 2, 1], 10, true)
+    def(
+      'player-die',
+      'sprites',
+      [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      10,
+      false,
+    )
+
+    GHOST_COLORS.forEach((color, i) => {
+      const tk = `sprites-ghost-${i}`
+      createColoredGhostTexture(this, 'sprites', tk, color)
+      def(`ghost-${i}-right`, tk, [14, 15], 6, true)
+      def(`ghost-${i}-left`, tk, [16, 17], 6, true)
+      def(`ghost-${i}-up`, tk, [18, 19], 6, true)
+      def(`ghost-${i}-down`, tk, [20, 21], 6, true)
+      def(`ghost-${i}-scared`, tk, [22, 23], 6, true)
+    })
   }
 }

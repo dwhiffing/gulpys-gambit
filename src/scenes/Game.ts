@@ -2,13 +2,15 @@ import type { Types } from 'phaser'
 import { Scene } from 'phaser'
 import { CELL, GHOST_STATE, TILES } from '../constants'
 import { Maze } from '../maze'
+import { MAZE_CONFIG } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
 import { PlayerSprite } from '../sprites/PlayerSprite'
+import { calcZoom } from '../utils'
 
 const { EATEN, EXITING, JAILED, SCARED } = GHOST_STATE
 
 export class Game extends Scene {
-  private maze!: Maze
+  maze!: Maze
   private player!: PlayerSprite
   private ghosts!: GhostSprite[]
   private cursors!: Types.Input.Keyboard.CursorKeys
@@ -22,14 +24,23 @@ export class Game extends Scene {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.gameState = 'playing'
 
-    this.maze = new Maze(this)
-    this.player = new PlayerSprite(this, 14, 28, this.maze.grid)
-    this.ghosts = [
-      new GhostSprite(this, 13, 14, 2, 0, this.maze.grid, 0),
-      new GhostSprite(this, 14, 14, 2, 500, this.maze.grid, 1),
-      new GhostSprite(this, 13, 15, 2, 1000, this.maze.grid, 2),
-      new GhostSprite(this, 14, 15, 2, 1500, this.maze.grid, 3),
-    ]
+    this.input.keyboard!.once('keydown-N', () => {
+      MAZE_CONFIG.cols += 1
+      MAZE_CONFIG.rows += 1
+      this.scene.restart()
+    })
+
+    this.maze = new Maze(this, MAZE_CONFIG)
+
+    const mazeW = this.maze.cols * CELL
+    const mazeH = this.maze.rows * CELL
+    this.scale.resize(mazeW, mazeH)
+    this.scale.setZoom(calcZoom(mazeW, mazeH))
+
+    this.player = new PlayerSprite(this)
+    this.ghosts = this.maze.spawners.map(
+      (spawner, i) => new GhostSprite(this, spawner, i),
+    )
   }
 
   update(_time: number, delta: number) {
@@ -60,7 +71,8 @@ export class Game extends Scene {
 
   private checkCollisions() {
     for (const g of this.ghosts) {
-      if (g.state === EATEN || g.state === EXITING || g.state === JAILED) continue
+      if (g.state === EATEN || g.state === EXITING || g.state === JAILED)
+        continue
       if (Math.abs(g.x - this.player.x) >= CELL * 0.7) continue
       if (Math.abs(g.y - this.player.y) >= CELL * 0.7) continue
 

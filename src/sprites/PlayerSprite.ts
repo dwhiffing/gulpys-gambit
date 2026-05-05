@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser'
 import { ANGLES, CELL, DIRS, DX, DY, PLAYER_SPEED } from '../constants'
-import { canMove, wrapX } from '../utils'
+import type { Game } from '../scenes/Game'
+import { canMove, wrapX, wrapY } from '../utils'
 
 export class PlayerSprite {
   tileX: number
@@ -12,25 +13,23 @@ export class PlayerSprite {
   x: number
   y: number
   sprite: Phaser.GameObjects.Sprite
-
-  constructor(
-    scene: Phaser.Scene,
-    tileX: number,
-    tileY: number,
-    private grid: number[][],
-  ) {
-    this.tileX = tileX
-    this.tileY = tileY
+  constructor(private scene: Game) {
+    this.tileX = scene.maze.playerSpawn.x
+    this.tileY = scene.maze.playerSpawn.y
     this.dir = DIRS.LEFT
     this.nextDir = DIRS.LEFT
-    const px = tileX * CELL + CELL / 2
-    const py = tileY * CELL + CELL / 2
+    const px = this.tileX * CELL + CELL / 2
+    const py = this.tileY * CELL + CELL / 2
     this.x = px
     this.y = py
     this.sprite = scene.add
       .sprite(px, py, 'sprites', 0)
       .setDepth(2)
       .setAngle(ANGLES[DIRS.LEFT])
+  }
+
+  get grid() {
+    return this.scene.maze.grid
   }
 
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
@@ -61,8 +60,8 @@ export class PlayerSprite {
       this.progress += (PLAYER_SPEED * delta) / 1000
       if (this.progress >= 1) {
         this.progress -= 1
-        this.tileX = wrapX(this.tileX + DX[this.dir])
-        this.tileY += DY[this.dir]
+        this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
+        this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
 
         if (canMove(this.grid, this.tileX, this.tileY, this.nextDir, false)) {
           this.dir = this.nextDir
@@ -76,7 +75,7 @@ export class PlayerSprite {
           this.sprite.setFrame(1)
         }
 
-        return true // tile landed — caller should eat dot
+        return true
       }
     }
 
