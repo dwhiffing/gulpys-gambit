@@ -9,9 +9,10 @@ import {
   DX,
   DY,
   PLAYER_SPEED,
+  SPIN_DURATION,
 } from '../constants'
 import type { Game } from '../scenes/Game'
-import { canMove, wrapX, wrapY } from '../utils'
+import { canMove, isWrapping, moveFrac, wrapX, wrapY } from '../utils'
 
 export class PlayerSprite {
   tileX: number
@@ -26,6 +27,8 @@ export class PlayerSprite {
   private dashCooldown = 0
   private dashing = false
   private dashDistanceLeft = 0
+  private spinning = false
+  private spinTimer = 0
   private zKey: Phaser.Input.Keyboard.Key
   constructor(private scene: Game) {
     this.tileX = scene.maze.playerSpawn.x
@@ -36,11 +39,58 @@ export class PlayerSprite {
     const py = this.tileY * CELL + CELL / 2
     this.x = px
     this.y = py
-    this.sprite = scene.add
-      .sprite(px, py, 'sprites', 0)
-      .setDepth(2)
-      .setAngle(ANGLES[DIRS.LEFT])
+    this.sprite = scene.add.sprite(px, py, 'sprites', 0).setDepth(2)
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
+    this.applyDir(this.dir)
+    this.sprite.play('player-move')
+  }
+
+  private applyDir(dir: number) {
+    this.sprite
+      .setAngle(dir === DIRS.LEFT ? 0 : ANGLES[dir])
+      .setFlip(dir === DIRS.LEFT, false)
+  }
+
+  private get wrapping(): boolean {
+    return isWrapping(
+      this.tileX,
+      this.tileY,
+      this.dir,
+      this.grid[0].length,
+      this.grid.length,
+    )
+  }
+
+  private updatePosition() {
+    const cols = this.grid[0].length
+    const rows = this.grid.length
+    const { x: fracX, y: fracY } = this.moving
+      ? moveFrac(this.tileX, this.tileY, this.dir, this.progress, cols, rows)
+      : { x: this.tileX, y: this.tileY }
+    this.x = fracX * CELL + CELL / 2
+    this.y = fracY * CELL + CELL / 2
+    this.sprite.setPosition(this.x, this.y)
+    this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
+  }
+
+  private isFlip(a: number, b: number): boolean {
+    return (a ^ b) === 1
+  }
+
+  private turnTo(dir: number) {
+    const oldDir = this.dir
+    this.dir = dir
+    this.spinning = true
+    this.spinTimer = SPIN_DURATION
+    if (this.isFlip(oldDir, dir)) {
+      this.applyDir(dir)
+      this.sprite.play('player-flip')
+      return
+    }
+    this.sprite
+      .setAngle(0)
+      .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
+    this.sprite.play('player-spin')
   }
 
   get grid() {
@@ -55,9 +105,16 @@ export class PlayerSprite {
     else if (cursors.up.isDown) this.nextDir = DIRS.UP
     else if (cursors.down.isDown) this.nextDir = DIRS.DOWN
 
+    if (this.moving && !this.wrapping && this.isFlip(this.dir, this.nextDir)) {
+      const prevDir = this.dir
+      this.turnTo(this.nextDir)
+      this.tileX = wrapX(this.tileX + DX[prevDir], this.grid[0].length)
+      this.tileY = wrapY(this.tileY + DY[prevDir], this.grid.length)
+      this.progress = 1 - this.progress
+    }
+
     if (!this.moving && this.nextDir !== this.dir) {
-      this.dir = this.nextDir
-      this.sprite.setAngle(ANGLES[this.dir])
+      this.turnTo(this.nextDir)
     }
 
     const wasMoving = this.moving
@@ -75,8 +132,9 @@ export class PlayerSprite {
     }
     if (!this.moving) {
       if (canMove(this.grid, this.tileX, this.tileY, this.nextDir, false)) {
-        this.dir = this.nextDir
-        this.sprite.setAngle(ANGLES[this.dir])
+        if (this.nextDir !== this.dir) {
+          this.turnTo(this.nextDir)
+        }
         this.moving = true
       } else if (canMove(this.grid, this.tileX, this.tileY, this.dir, false)) {
         this.moving = true
@@ -84,10 +142,18 @@ export class PlayerSprite {
     }
 
     if (this.moving && !wasMoving) {
-      this.sprite.play('player-move')
+      if (!this.spinning) this.sprite.play('player-move')
     } else if (!this.moving && wasMoving) {
       this.sprite.stop()
-      if (this.sprite.frame.name === '0') this.sprite.setFrame(1)
+    }
+
+    if (this.spinning) {
+      this.spinTimer -= delta
+      if (this.spinTimer <= 0) {
+        this.spinning = false
+        this.applyDir(this.dir)
+        this.sprite.play('player-move')
+      }
     }
 
     if (this.moving) {
@@ -101,46 +167,35 @@ export class PlayerSprite {
       }
       this.progress += moveStep * (this.dashing ? 3 : 1)
 
-      if (this.tryCornering(cursors)) return true
+      if (!this.wrapping && this.tryCornering(cursors)) return true
 
-      if (this.progress >= 1) {
-        this.progress -= 1
+      const threshold = this.wrapping ? 2 : 1
+      if (this.progress >= threshold) {
+        this.progress -= threshold
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
         this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
 
         if (canMove(this.grid, this.tileX, this.tileY, this.nextDir, false)) {
-          this.dir = this.nextDir
-          this.sprite.setAngle(ANGLES[this.dir])
+          if (this.nextDir !== this.dir) {
+            this.turnTo(this.nextDir)
+          }
         } else if (
           !this.dashing &&
           !canMove(this.grid, this.tileX, this.tileY, this.dir, false)
         ) {
           this.moving = false
           this.progress = 0
-          this.sprite.stop().setFrame(1)
         }
 
+        this.updatePosition()
         return true
       }
     }
 
-    const fracX = this.moving
-      ? this.tileX + DX[this.dir] * this.progress
-      : this.tileX
-    const fracY = this.moving
-      ? this.tileY + DY[this.dir] * this.progress
-      : this.tileY
-    this.x = fracX * CELL + CELL / 2
-    this.y = fracY * CELL + CELL / 2
-    this.sprite.setPosition(this.x, this.y)
-    this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
+    this.updatePosition()
     return false
   }
 
-  // Cornering: if the player is actively holding a perpendicular direction,
-  // that turn is valid at the destination tile, and we're past the threshold,
-  // snap to the corner early (saves the remaining progress).
-  // Does NOT trigger for buffered/queued inputs — key must be held right now.
   private tryCornering(
     cursors: Phaser.Types.Input.Keyboard.CursorKeys,
   ): boolean {
@@ -165,14 +220,13 @@ export class PlayerSprite {
     this.tileX = destX
     this.tileY = destY
     this.progress = 0
-    this.dir = heldDir
+    this.turnTo(heldDir)
     this.nextDir = heldDir
-    this.sprite.setAngle(ANGLES[this.dir])
     return true
   }
 
   die() {
-    this.sprite.setAngle(0)
-    this.sprite.play('player-die')
+    this.spinning = false
+    this.sprite.setAngle(0).setFlipX(false).play('player-die')
   }
 }

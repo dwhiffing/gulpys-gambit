@@ -15,8 +15,8 @@ const game = new Game({
   height: NATIVE_H,
   zoom: calcZoom(NATIVE_W, NATIVE_H),
   parent: 'game-container',
-  backgroundColor: '#000000',
-  smoothPixelArt: true,
+  backgroundColor: '#130427',
+  pixelArt: true,
   scene: [BootScene, MenuScene, GameScene],
 })
 

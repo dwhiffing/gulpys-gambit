@@ -1,5 +1,4 @@
-import { Scene } from 'phaser'
-import { CELL, DX, DY, TILES } from './constants'
+import { DX, DY, TILES } from './constants'
 
 export function wrapX(x: number, cols: number): number {
   if (x < 0) return cols - 1
@@ -13,6 +12,52 @@ export function wrapY(y: number, rows: number): number {
   return y
 }
 
+export function isWrapping(
+  tileX: number,
+  tileY: number,
+  dir: number,
+  cols: number,
+  rows: number,
+): boolean {
+  const nx = tileX + DX[dir]
+  const ny = tileY + DY[dir]
+  return nx < 0 || nx >= cols || ny < 0 || ny >= rows
+}
+
+export function moveFrac(
+  tileX: number,
+  tileY: number,
+  dir: number,
+  progress: number,
+  cols: number,
+  rows: number,
+): { x: number; y: number } {
+  if (isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) {
+    const entryX = wrapX(tileX + DX[dir], cols)
+    const entryY = wrapY(tileY + DY[dir], rows)
+    return {
+      x: entryX + DX[dir] * (progress - 2),
+      y: entryY + DY[dir] * (progress - 2),
+    }
+  }
+  return {
+    x: tileX + DX[dir] * progress,
+    y: tileY + DY[dir] * progress,
+  }
+}
+
+export function stepTile(
+  grid: number[][],
+  x: number,
+  y: number,
+  dir: number,
+): { x: number; y: number } {
+  return {
+    x: wrapX(x + DX[dir], grid[0].length),
+    y: wrapY(y + DY[dir], grid.length),
+  }
+}
+
 export function canMove(
   grid: number[][],
   tx: number,
@@ -20,10 +65,7 @@ export function canMove(
   dir: number,
   canUseDoor: boolean,
 ): boolean {
-  const rows = grid.length
-  const cols = grid[0].length
-  const ny = wrapY(ty + DY[dir], rows)
-  const nx = wrapX(tx + DX[dir], cols)
+  const { x: nx, y: ny } = stepTile(grid, tx, ty, dir)
   const t = grid[ny][nx]
   if (t === TILES.WALL) return false
   if (t === TILES.DOOR && !canUseDoor) return false
@@ -46,68 +88,33 @@ export function generateGhostColors(n: number): [number, number, number][] {
   })
 }
 
-export function createColoredGhostTexture(
-  scene: Scene,
-  sourceKey: string,
-  destKey: string,
-  color: [number, number, number],
-) {
-  const source = scene.textures.get(sourceKey).source[0]
-  const img = source.image as HTMLImageElement | HTMLCanvasElement
-  const canvas = document.createElement('canvas')
-  canvas.width = (img as HTMLImageElement).naturalWidth || img.width
-  canvas.height = (img as HTMLImageElement).naturalHeight || img.height
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(img as CanvasImageSource, 0, 0)
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const data = imageData.data
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i],
-      g = data[i + 1],
-      b = data[i + 2]
-    // Match the red ghost body: high R, low G, low B
-    if (r > 180 && g < 100 && b < 100) {
-      data[i] = color[0]
-      data[i + 1] = color[1]
-      data[i + 2] = color[2]
+export const buildZoomSteps = (
+  min: number,
+  max: number,
+  intermediateSteps: number,
+) => {
+  const minExp = Math.log2(min)
+  const maxExp = Math.log2(max)
+  const powers: number[] = []
+  for (let e = minExp; e <= maxExp; e++) {
+    powers.push(2 ** e)
+  }
+  if (intermediateSteps === 0) return powers
+  const result: number[] = []
+  for (let i = 0; i < powers.length - 1; i++) {
+    result.push(powers[i])
+    for (let j = 1; j <= intermediateSteps; j++) {
+      result.push(powers[i] * 2 ** (j / (intermediateSteps + 1)))
     }
   }
-  ctx.putImageData(imageData, 0, 0)
-  // addSpriteSheet types don't include HTMLCanvasElement but Phaser supports it at runtime
-  scene.textures.addSpriteSheet(
-    destKey,
-    canvas as unknown as HTMLImageElement,
-    { frameWidth: CELL, frameHeight: CELL },
-  )
+  result.push(powers[powers.length - 1])
+  return result
 }
 
-// export const buildZoomSteps = (
-//   min: number,
-//   max: number,
-//   intermediateSteps: number,
-// ) => {
-//   const minExp = Math.log2(min)
-//   const maxExp = Math.log2(max)
-//   const powers: number[] = []
-//   for (let e = minExp; e <= maxExp; e++) {
-//     powers.push(2 ** e)
-//   }
-//   if (intermediateSteps === 0) return powers
-//   const result: number[] = []
-//   for (let i = 0; i < powers.length - 1; i++) {
-//     result.push(powers[i])
-//     for (let j = 1; j <= intermediateSteps; j++) {
-//       result.push(powers[i] * 2 ** (j / (intermediateSteps + 1)))
-//     }
-//   }
-//   result.push(powers[powers.length - 1])
-//   return result
-// }
-
-// const ZOOM_STEPS = buildZoomSteps(0.125, 4, 2)
+const ZOOM_STEPS = buildZoomSteps(0.125, 4, 2)
 export const calcZoom = (w: number, h: number) => {
   const raw = Math.min(window.innerWidth / w, window.innerHeight / h)
-  return raw
-  // const filtered = ZOOM_STEPS.filter((z) => z <= raw)
-  // return filtered.length ? filtered[filtered.length - 1] : ZOOM_STEPS[0]
+  // return raw
+  const filtered = ZOOM_STEPS.filter((z) => z <= raw)
+  return filtered.length ? filtered[filtered.length - 1] : ZOOM_STEPS[0]
 }

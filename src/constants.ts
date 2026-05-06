@@ -4,8 +4,9 @@ export const CELL = 32
 export const ANGLES = [0, 180, -90, 90]
 
 // player speed
-export const PLAYER_SPEED = 5
+export const PLAYER_SPEED = 4
 // how far through a tile (0–1) before a queued perpendicular turn snaps early
+export const SPIN_DURATION = 100
 export const CORNER_THRESHOLD = 0.75
 export const DASH_COOLDOWN = 1000 // ms between dashes
 export const DASH_DISTANCE = 1 // tiles
@@ -28,9 +29,9 @@ export const TILES = {
 export const DX = [1, -1, 0, 0]
 export const DY = [0, 0, -1, 1]
 
-export const GHOST_SPEED = 5
-export const GHOST_SCARED_SPEED = 3
-export const GHOST_EATEN_SPEED = 10
+export const GHOST_SPEED = 4
+export const GHOST_SCARED_SPEED = 1
+export const GHOST_EATEN_SPEED = 4
 export const POWER_DURATION = 8000
 export const SCARED_WARN = 2000
 

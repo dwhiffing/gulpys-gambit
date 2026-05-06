@@ -1,7 +1,5 @@
 import { Scene } from 'phaser'
 import { CELL } from '../constants'
-import { GHOST_COLORS } from '../mazeConfig'
-import { createColoredGhostTexture } from '../utils'
 
 export class Boot extends Scene {
   constructor() {
@@ -24,7 +22,11 @@ export class Boot extends Scene {
 
   preload() {
     this.load.setPath('assets')
-    this.load.spritesheet('sprites', 'placeholders-32.png', {
+    this.load.spritesheet('sprites', 'sprites.png', {
+      frameWidth: CELL,
+      frameHeight: CELL,
+    })
+    this.load.spritesheet('tiles', 'tiles.png', {
       frameWidth: CELL,
       frameHeight: CELL,
     })
@@ -52,23 +54,15 @@ export class Boot extends Scene {
           repeat: loop ? -1 : 0,
         })
     }
-    def('player-move', 'sprites', [0, 1, 2, 1], 10, true)
-    def(
-      'player-die',
-      'sprites',
-      [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-      10,
-      false,
-    )
-
-    GHOST_COLORS.forEach((color, i) => {
-      const tk = `sprites-ghost-${i}`
-      createColoredGhostTexture(this, 'sprites', tk, color)
-      def(`ghost-${i}-right`, tk, [14, 15], 6, true)
-      def(`ghost-${i}-left`, tk, [16, 17], 6, true)
-      def(`ghost-${i}-up`, tk, [18, 19], 6, true)
-      def(`ghost-${i}-down`, tk, [20, 21], 6, true)
-      def(`ghost-${i}-scared`, tk, [22, 23], 6, true)
-    })
+    def('player-move', 'sprites', [6, 7], 6, true)
+    def('player-spin', 'sprites', [8], 0, false)
+    def('player-flip', 'sprites', [9], 0, false)
+    def('player-die', 'sprites', [10, 11], 6, true)
+    def('fish-1', 'sprites', [0, 1], 2, true)
+    def('fish-2', 'sprites', [2, 3], 2, true)
+    def('fish-3', 'sprites', [4, 5], 2, true)
+    def('fish-4', 'sprites', [12, 13], 2, true)
+    def('fish-5', 'sprites', [14, 15], 2, true)
+    def('fish-6', 'sprites', [16, 17], 2, true)
   }
 }

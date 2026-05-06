@@ -54,13 +54,13 @@ export class Maze {
         const px = x * CELL + CELL / 2
         const py = y * CELL + CELL / 2
         if (t === TILES.WALL || t === TILES.DOOR) {
-          const frame = t === TILES.DOOR ? 43 : 42
-          this.walls.push(this.scene.add.sprite(px, py, 'sprites', frame))
+          const frame = t === TILES.DOOR ? 1 : 0
+          this.walls.push(this.scene.add.sprite(px, py, 'tiles', frame))
         } else if (t === TILES.DOT || t === TILES.POWER) {
-          const frame = t === TILES.POWER ? 37 : 36
+          const frame = t === TILES.POWER ? 3 : 2
           this.dots.push(
             this.scene.add
-              .sprite(px, py, 'sprites', frame)
+              .sprite(px, py, 'tiles', frame)
               .setData('tileX', x)
               .setData('tileY', y),
           )

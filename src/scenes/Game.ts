@@ -14,12 +14,12 @@ const CHASE_DURATION = 5000
 
 export class Game extends Scene {
   maze!: Maze
-  private player!: PlayerSprite
+  inScatter = true
+  player!: PlayerSprite
   private ghosts!: GhostSprite[]
   private cursors!: Types.Input.Keyboard.CursorKeys
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
   private scatterTimer = SCATTER_DURATION
-  private inScatter = true
 
   constructor() {
     super('Game')
@@ -58,8 +58,7 @@ export class Game extends Scene {
     }
 
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
-    for (const g of this.ghosts)
-      g.update(delta, this.player.tileX, this.player.tileY, this.player.dir, blinkyPos, this.inScatter)
+    for (const g of this.ghosts) g.update(delta, blinkyPos)
 
     const landed = this.player.update(delta, this.cursors)
     if (landed) this.eatDot(this.player.tileX, this.player.tileY)
@@ -100,6 +99,6 @@ export class Game extends Scene {
     this.gameState = 'dying'
     this.player.die()
     for (const g of this.ghosts) g.hide()
-    this.time.delayedCall(1400 + 2000, () => this.scene.restart())
+    this.time.delayedCall(1000, () => this.scene.restart())
   }
 }
