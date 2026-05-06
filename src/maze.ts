@@ -341,6 +341,8 @@ function generateMaze(config: MazeConfig): GenerateResult {
   const playerSpawn =
     spawnCandidates[Math.floor(Math.random() * spawnCandidates.length)]
 
+  grid[playerSpawn.y][playerSpawn.x] = TILES.EMPTY
+
   return { grid, cols, rows, spawners, playerSpawn }
 }
 
