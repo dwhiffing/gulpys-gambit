@@ -9,7 +9,7 @@ const { CHASE, SCARED, EATEN, EXITING, JAILED } = C.GHOST_STATE
 
 const OPPOSITE = [C.DIRS.LEFT, C.DIRS.RIGHT, C.DIRS.DOWN, C.DIRS.UP]
 
-export const DEBUG_GHOST_TARGETS = true
+export const DEBUG_GHOST_TARGETS = false
 
 export class GhostSprite {
   tileX: number
@@ -405,27 +405,29 @@ export class GhostSprite {
 
       // When wrapping, the tile delta sign is inverted relative to actual movement direction
       // (e.g. moving left from x=0 lands at x=cols-1, giving dx=cols-1 which looks rightward)
-      const actualNdx = dx === 0 ? 0 : wraps ? (dx > 0 ? -1 : 1) : (dx > 0 ? 1 : -1)
-      const actualNdy = dy === 0 ? 0 : wraps ? (dy > 0 ? -1 : 1) : (dy > 0 ? 1 : -1)
+      const actualNdx =
+        dx === 0 ? 0 : wraps ? (dx > 0 ? -1 : 1) : dx > 0 ? 1 : -1
+      const actualNdy =
+        dy === 0 ? 0 : wraps ? (dy > 0 ? -1 : 1) : dy > 0 ? 1 : -1
       const [nextX, nextY] = toPx(path[i], actualNdx, actualNdy)
 
       if (wraps) {
         const ox = -actualNdy * perpOffset
         const oy = actualNdx * perpOffset
         // Exit pixel: on the grid boundary in the actual movement direction
-        const exitX = dx !== 0
-          ? (actualNdx < 0 ? 0 : this.cols * C.CELL) + ox
-          : path[i - 1].x * C.CELL + C.CELL / 2 + ox
-        const exitY = dy !== 0
-          ? (actualNdy < 0 ? 0 : this.rows * C.CELL) + oy
-          : path[i - 1].y * C.CELL + C.CELL / 2 + oy
+        const exitX =
+          dx !== 0
+            ? (actualNdx < 0 ? 0 : this.cols * C.CELL) + ox
+            : path[i - 1].x * C.CELL + C.CELL / 2 + ox
+        const exitY =
+          dy !== 0
+            ? (actualNdy < 0 ? 0 : this.rows * C.CELL) + oy
+            : path[i - 1].y * C.CELL + C.CELL / 2 + oy
         // Entry pixel: opposite boundary
-        const entryX = dx !== 0
-          ? (actualNdx < 0 ? this.cols * C.CELL : 0) + ox
-          : exitX
-        const entryY = dy !== 0
-          ? (actualNdy < 0 ? this.rows * C.CELL : 0) + oy
-          : exitY
+        const entryX =
+          dx !== 0 ? (actualNdx < 0 ? this.cols * C.CELL : 0) + ox : exitX
+        const entryY =
+          dy !== 0 ? (actualNdy < 0 ? this.rows * C.CELL : 0) + oy : exitY
 
         this.debugLine.beginPath()
         this.debugLine.moveTo(curX, curY)
