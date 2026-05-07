@@ -208,21 +208,6 @@ export class Maze {
         }
       }
     }
-
-    let blinkOn = true
-    const powerSprites = this.dotGroup
-      .getChildren()
-      .filter(
-        (s) => (s as Phaser.Physics.Arcade.Sprite).getData('power') === true,
-      ) as Phaser.Physics.Arcade.Sprite[]
-    this.scene.time.addEvent({
-      delay: 250,
-      loop: true,
-      callback: () => {
-        blinkOn = !blinkOn
-        for (const s of powerSprites) s.setAlpha(blinkOn ? 1 : 0)
-      },
-    })
   }
 }
 
