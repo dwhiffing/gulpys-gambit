@@ -11,17 +11,6 @@ export type MazeSymmetry =
   | 'rotational' // 180° point-symmetric (top-left ↔ bottom-right)
   | 'quad' // mirrored on both axes (4-fold reflective)
 
-export interface GhouseConfig {
-  /** Tile column of the left outer wall */
-  col: number
-  /** Tile row of the top outer wall (this row holds the door) */
-  row: number
-  /** Interior width in tiles — must be ≥ 1 (odd = 1-tile door, even = 2-tile door) */
-  width: number
-  /** Interior height in tiles — must be ≥ 1 */
-  height: number
-}
-
 export interface WrapConfig {
   /** Max paired left/right wrap corridors (0 = none) */
   x: number
@@ -41,28 +30,21 @@ export interface MazeConfig {
    * Values around 0.15–0.25 produce playable Pac-Man corridors.
    */
   loopFactor: number
-  house: GhouseConfig
   wraps: WrapConfig
-  /** Number of ghosts to spawn — each gets a unique color. Must fit inside the house interior. */
+  /** Number of ghosts to spawn. Each is assigned a wrap tile as its spawn/respawn point. */
   ghostCount: number
   /** Number of power pellets to place. Spread evenly around the maze perimeter. */
   powerCount: number
 }
 
-const S = 30
+const S = 24
 export const MAZE_CONFIG: MazeConfig = {
   cols: S,
-  rows: Math.floor(S * 0.75),
+  rows: Math.floor(S * 1.25),
   symmetry: 'none',
   loopFactor: 0.2,
-  house: {
-    col: Math.floor(S / 2),
-    row: Math.floor(S / 2),
-    width: 4,
-    height: 1,
-  },
   wraps: { x: 2, y: 1 },
-  ghostCount: 4,
+  ghostCount: 1,
   powerCount: 0,
 }
 

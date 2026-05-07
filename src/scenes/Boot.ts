@@ -23,12 +23,16 @@ export class Boot extends Scene {
   preload() {
     this.load.setPath('assets')
     this.load.spritesheet('sprites', 'sprites.png', {
+      frameWidth: CELL * 2,
+      frameHeight: CELL * 2,
+    })
+    this.load.spritesheet('tiles', 'tiles2.png', {
       frameWidth: CELL,
       frameHeight: CELL,
     })
-    this.load.spritesheet('tiles', 'tiles.png', {
-      frameWidth: CELL,
-      frameHeight: CELL,
+    this.load.spritesheet('dots', 'tiles.png', {
+      frameWidth: CELL * 2,
+      frameHeight: CELL * 2,
     })
   }
 

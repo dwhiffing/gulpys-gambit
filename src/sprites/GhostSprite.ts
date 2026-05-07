@@ -1,11 +1,12 @@
 import * as Phaser from 'phaser'
 import * as C from '../constants'
+import { WRAP_DELAY } from '../constants'
 import type { Spawner, TilePos } from '../maze'
 import { GHOST_COLORS } from '../mazeConfig'
 import type { Game } from '../scenes/Game'
 import { canMove, isWrapping, moveFrac, wrapX, wrapY } from '../utils'
 
-const { CHASE, SCARED, EATEN, EXITING, JAILED } = C.GHOST_STATE
+const { CHASE, SCARED, EATEN, JAILED } = C.GHOST_STATE
 
 const OPPOSITE = [C.DIRS.LEFT, C.DIRS.RIGHT, C.DIRS.DOWN, C.DIRS.UP]
 
@@ -18,16 +19,18 @@ export class GhostSprite {
   dir: number
   x: number
   y: number
-  sprite: Phaser.GameObjects.Sprite
+  sprite: Phaser.Physics.Arcade.Sprite
   state: number
   scaredTimer = 0
   jailTimer = 0
   exitDelay: number
+  private spawning = false
+  private wrapPauseTimer = 0
+  private wrapPaused = false
 
   private colorIndex: number
   private aiType: 1 | 2 | 3 | 4
-  private jailPos!: TilePos
-  private exitTile!: TilePos
+  private spawnTile!: TilePos
   private cols!: number
   private rows!: number
   private debugLine: Phaser.GameObjects.Graphics | null = null
@@ -38,23 +41,37 @@ export class GhostSprite {
     spawner: Spawner,
     colorIndex: number,
   ) {
-    this.jailPos = spawner.position
-    this.exitTile = spawner.exit
+    this.spawnTile = spawner.position
     this.cols = scene.maze.grid[0].length
     this.rows = scene.maze.grid.length
     this.tileX = spawner.position.x
     this.tileY = spawner.position.y
-    this.dir = 2
-    this.exitDelay = colorIndex * 500
+    this.exitDelay = 1000 + colorIndex * 500
     this.colorIndex = colorIndex
     this.aiType = ((colorIndex % 4) + 1) as 1 | 2 | 3 | 4
-    this.state = EXITING
-    const px = this.tileX * C.CELL + C.CELL / 2
-    const py = this.tileY * C.CELL + C.CELL / 2
+    this.state = CHASE
+
+    // Infer inward direction from which border the spawn tile is on
+    if (this.tileX === 0) this.dir = C.DIRS.RIGHT
+    else if (this.tileX === this.cols - 1) this.dir = C.DIRS.LEFT
+    else if (this.tileY === 0) this.dir = C.DIRS.DOWN
+    else this.dir = C.DIRS.UP
+
+    const px = this.tileX * C.CELL + C.CELL
+    const py = this.tileY * C.CELL + C.CELL
     this.x = px
     this.y = py
     const tk = `sprites-ghost-${colorIndex}`
-    this.sprite = scene.add.sprite(px, py, tk).setDepth(2)
+    this.sprite = scene.physics.add
+      .sprite(px, py, tk)
+      .setDepth(2)
+      .setVisible(false)
+    ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
+      C.CELL * 0.6,
+      C.CELL * 0.4,
+      C.CELL * 0.4,
+    )
+    this.sprite.setData('ghost', this)
     this.sprite.play(`fish-${colorIndex + 1}`)
 
     if (DEBUG_GHOST_TARGETS) {
@@ -88,11 +105,7 @@ export class GhostSprite {
   }
 
   scare() {
-    if (
-      this.state !== EATEN &&
-      this.state !== EXITING &&
-      this.state !== JAILED
-    ) {
+    if (this.state !== EATEN && this.state !== JAILED) {
       this.state = SCARED
       this.scaredTimer = C.POWER_DURATION
       this.sprite.setAlpha(1)
@@ -139,13 +152,10 @@ export class GhostSprite {
     playerDir: number,
     blinkyPos: TilePos,
   ): TilePos {
-    if (this.state === EATEN) return this.jailPos
-    if (this.state === EXITING) return this.exitTile
-
-    if (this.scene.inScatter) return this.getScatterCorner()
+    if (this.state === EATEN) return this.spawnTile
 
     if (this.aiType === 4) {
-      // Also scatter when player is within 8 tiles
+      // scatter when player is within 8 tiles
       const dist =
         Math.abs(this.tileX - playerTileX) + Math.abs(this.tileY - playerTileY)
       if (dist <= 8) return this.getScatterCorner()
@@ -186,16 +196,13 @@ export class GhostSprite {
       playerDir,
       blinkyPos,
     )
-    const canUseDoor = this.state === EATEN || this.state === EXITING
-
     if (this.state === SCARED) {
       // Scared: greedily flee — no cycle risk since any direction is acceptable
       let bestDir = -1
       let bestDist = -Infinity
       for (let dir = 0; dir < 4; dir++) {
         if (dir === OPPOSITE[this.dir]) continue
-        if (!canMove(this.grid, this.tileX, this.tileY, dir, canUseDoor))
-          continue
+        if (!canMove(this.grid, this.tileX, this.tileY, dir, false)) continue
         const nx = wrapX(this.tileX + C.DX[dir], this.cols)
         const ny = wrapY(this.tileY + C.DY[dir], this.rows)
         const dist = Math.hypot(nx - target.x, ny - target.y)
@@ -206,13 +213,7 @@ export class GhostSprite {
       }
       if (
         bestDir === -1 &&
-        canMove(
-          this.grid,
-          this.tileX,
-          this.tileY,
-          OPPOSITE[this.dir],
-          canUseDoor,
-        )
+        canMove(this.grid, this.tileX, this.tileY, OPPOSITE[this.dir], false)
       )
         bestDir = OPPOSITE[this.dir]
       return bestDir
@@ -225,7 +226,7 @@ export class GhostSprite {
 
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[this.dir]) continue
-      if (!canMove(this.grid, this.tileX, this.tileY, dir, canUseDoor)) continue
+      if (!canMove(this.grid, this.tileX, this.tileY, dir, false)) continue
       const nx = wrapX(this.tileX + C.DX[dir], this.cols)
       const ny = wrapY(this.tileY + C.DY[dir], this.rows)
       const key = `${nx},${ny}`
@@ -240,7 +241,7 @@ export class GhostSprite {
       const { x, y, firstDir } = queue[head++]
       if (x === target.x && y === target.y) return firstDir
       for (let dir = 0; dir < 4; dir++) {
-        if (!canMove(this.grid, x, y, dir, canUseDoor)) continue
+        if (!canMove(this.grid, x, y, dir, false)) continue
         const nx = wrapX(x + C.DX[dir], this.cols)
         const ny = wrapY(y + C.DY[dir], this.rows)
         const key = `${nx},${ny}`
@@ -254,12 +255,9 @@ export class GhostSprite {
     // Target unreachable — any valid non-reverse move
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[this.dir]) continue
-      if (canMove(this.grid, this.tileX, this.tileY, dir, canUseDoor))
-        return dir
+      if (canMove(this.grid, this.tileX, this.tileY, dir, false)) return dir
     }
-    if (
-      canMove(this.grid, this.tileX, this.tileY, OPPOSITE[this.dir], canUseDoor)
-    )
+    if (canMove(this.grid, this.tileX, this.tileY, OPPOSITE[this.dir], false))
       return OPPOSITE[this.dir]
     return -1
   }
@@ -276,8 +274,6 @@ export class GhostSprite {
       playerDir,
       blinkyPos,
     )
-    const canUseDoor = this.state === EATEN || this.state === EXITING
-
     // BFS — reconstruct the full tile path to target
     type Node = { x: number; y: number; parent: Node | null }
     const visited = new Map<string, Node>()
@@ -289,7 +285,7 @@ export class GhostSprite {
     // Seed only from current direction (ghost can't reverse mid-tile)
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[this.dir]) continue
-      if (!canMove(this.grid, this.tileX, this.tileY, dir, canUseDoor)) continue
+      if (!canMove(this.grid, this.tileX, this.tileY, dir, false)) continue
       const nx = wrapX(this.tileX + C.DX[dir], this.cols)
       const ny = wrapY(this.tileY + C.DY[dir], this.rows)
       const key = `${nx},${ny}`
@@ -309,7 +305,7 @@ export class GhostSprite {
         break
       }
       for (let dir = 0; dir < 4; dir++) {
-        if (!canMove(this.grid, node.x, node.y, dir, canUseDoor)) continue
+        if (!canMove(this.grid, node.x, node.y, dir, false)) continue
         const nx = wrapX(node.x + C.DX[dir], this.cols)
         const ny = wrapY(node.y + C.DY[dir], this.rows)
         const key = `${nx},${ny}`
@@ -356,8 +352,8 @@ export class GhostSprite {
     this.debugLine.strokeRect(
       target.x * C.CELL + 1,
       target.y * C.CELL + 1,
-      C.CELL - 2,
-      C.CELL - 2,
+      C.CELL * 2 - 2,
+      C.CELL * 2 - 2,
     )
     if (path.length < 2) return
     this.debugLine.lineStyle(3, color, 0.8)
@@ -367,8 +363,8 @@ export class GhostSprite {
       const ndx = segDx === 0 ? 0 : segDx > 0 ? 1 : -1
       const ndy = segDy === 0 ? 0 : segDy > 0 ? 1 : -1
       return [
-        tile.x * C.CELL + C.CELL / 2 + -ndy * perpOffset,
-        tile.y * C.CELL + C.CELL / 2 + ndx * perpOffset,
+        tile.x * C.CELL + C.CELL + -ndy * perpOffset,
+        tile.y * C.CELL + C.CELL + ndx * perpOffset,
       ]
     }
 
@@ -399,11 +395,11 @@ export class GhostSprite {
         const exitX =
           dx !== 0
             ? (actualNdx < 0 ? 0 : this.cols * C.CELL) + ox
-            : path[i - 1].x * C.CELL + C.CELL / 2 + ox
+            : path[i - 1].x * C.CELL + C.CELL + ox
         const exitY =
           dy !== 0
             ? (actualNdy < 0 ? 0 : this.rows * C.CELL) + oy
-            : path[i - 1].y * C.CELL + C.CELL / 2 + oy
+            : path[i - 1].y * C.CELL + C.CELL + oy
         // Entry pixel: opposite boundary
         const entryX =
           dx !== 0 ? (actualNdx < 0 ? this.cols * C.CELL : 0) + ox : exitX
@@ -428,6 +424,29 @@ export class GhostSprite {
     }
   }
 
+  private startEntryTween() {
+    // Compute the off-screen start position: one tile beyond the border in entry direction
+    const targetX = this.tileX * C.CELL + C.CELL
+    const targetY = this.tileY * C.CELL + C.CELL
+    const fromX = targetX - C.DX[this.dir] * C.CELL * 2
+    const fromY = targetY - C.DY[this.dir] * C.CELL * 2
+
+    this.sprite.setPosition(fromX, fromY)
+    this.sprite.setVisible(true)
+    this.spawning = true
+
+    this.scene.tweens.add({
+      targets: this.sprite,
+      x: targetX,
+      y: targetY,
+      duration: 400,
+      ease: 'Linear',
+      onComplete: () => {
+        this.spawning = false
+      },
+    })
+  }
+
   update(delta: number, blinkyPos: TilePos) {
     const playerTileX = this.scene.player.tileX
     const playerTileY = this.scene.player.tileY
@@ -435,25 +454,32 @@ export class GhostSprite {
     if (this.state === JAILED) {
       this.jailTimer -= delta
       if (this.jailTimer <= 0) {
-        this.state = EXITING
+        this.state = CHASE
         this.playAnim()
       } else {
-        this.x = this.jailPos.x * C.CELL + C.CELL / 2
-        this.y = this.jailPos.y * C.CELL + C.CELL / 2
+        this.x = this.spawnTile.x * C.CELL + C.CELL
+        this.y = this.spawnTile.y * C.CELL + C.CELL
         this.sprite.setPosition(this.x, this.y)
       }
       return
     }
 
-    if (this.state === EXITING) {
-      if (this.exitDelay > 0) {
-        this.exitDelay -= delta
-        return
+    if (this.spawning) return
+
+    if (this.state === CHASE && this.exitDelay > 0) {
+      if (!this.wrapIndicator.visible) {
+        this.wrapIndicator.setPosition(
+          this.spawnTile.x * C.CELL + C.CELL,
+          this.spawnTile.y * C.CELL + C.CELL,
+        )
+        this.wrapIndicator.setVisible(true)
       }
-      if (this.tileX === this.exitTile.x && this.tileY === this.exitTile.y) {
-        this.state = CHASE
-        this.playAnim()
+      this.exitDelay -= delta
+      if (this.exitDelay <= 0) {
+        this.wrapIndicator.setVisible(false)
+        this.startEntryTween()
       }
+      return
     }
 
     if (this.state === SCARED) {
@@ -468,6 +494,28 @@ export class GhostSprite {
       }
     }
 
+    if (this.wrapPauseTimer > 0) {
+      this.wrapPauseTimer -= delta
+      if (this.wrapPauseTimer <= 0) {
+        this.wrapPauseTimer = 0
+        this.progress = 0
+        const { x: fx, y: fy } = moveFrac(
+          this.tileX,
+          this.tileY,
+          this.dir,
+          0,
+          this.cols,
+          this.rows,
+          true,
+        )
+        this.x = fx * C.CELL + C.CELL
+        this.y = fy * C.CELL + C.CELL
+        this.sprite.setPosition(this.x, this.y)
+        this.sprite.setVisible(true)
+      }
+      return
+    }
+
     const speed =
       this.state === SCARED
         ? C.GHOST_SCARED_SPEED
@@ -477,28 +525,29 @@ export class GhostSprite {
 
     this.progress += (speed * delta) / 1000
 
-    const threshold = this.wrapping ? 2 : 1
-    if (this.progress >= threshold) {
+    if (this.wrapping && !this.wrapPaused && this.progress >= 1) {
+      this.progress = 1
+      this.wrapPaused = true
+      this.wrapPauseTimer = WRAP_DELAY
+      this.sprite.setVisible(false)
+      return
+    }
+
+    if (this.progress >= (this.wrapPaused ? 2 : 1)) {
+      const threshold = this.wrapPaused ? 2 : 1
+      this.wrapPaused = false
       this.progress -= threshold
       this.tileX = wrapX(this.tileX + C.DX[this.dir], this.cols)
       this.tileY = wrapY(this.tileY + C.DY[this.dir], this.rows)
 
       if (
         this.state === EATEN &&
-        this.tileX === this.jailPos.x &&
-        this.tileY === this.jailPos.y
+        this.tileX === this.spawnTile.x &&
+        this.tileY === this.spawnTile.y
       ) {
         this.state = JAILED
         this.jailTimer = 1000
         this.progress = 0
-        this.playAnim()
-      } else if (
-        this.state === EXITING &&
-        this.tileX === this.exitTile.x &&
-        this.tileY === this.exitTile.y
-      ) {
-        this.state = CHASE
-        this.sprite.setAlpha(1)
         this.playAnim()
       }
 
@@ -521,9 +570,10 @@ export class GhostSprite {
       this.progress,
       this.cols,
       this.rows,
+      this.wrapPaused,
     )
-    this.x = fracX * C.CELL + C.CELL / 2
-    this.y = fracY * C.CELL + C.CELL / 2
+    this.x = fracX * C.CELL + C.CELL
+    this.y = fracY * C.CELL + C.CELL
     this.sprite.setPosition(this.x, this.y)
     this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
 
@@ -541,8 +591,8 @@ export class GhostSprite {
     const destY = this.tileY + C.DY[this.dir]
     if (this.wrapping) {
       this.wrapIndicator.setPosition(
-        wrapX(destX, this.cols) * C.CELL + C.CELL / 2,
-        wrapY(destY, this.rows) * C.CELL + C.CELL / 2,
+        wrapX(destX, this.cols) * C.CELL + C.CELL,
+        wrapY(destY, this.rows) * C.CELL + C.CELL,
       )
       this.wrapIndicator.setVisible(true)
       return
@@ -555,8 +605,8 @@ export class GhostSprite {
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
         const entryTile = path[i]
         this.wrapIndicator.setPosition(
-          entryTile.x * C.CELL + C.CELL / 2,
-          entryTile.y * C.CELL + C.CELL / 2,
+          entryTile.x * C.CELL + C.CELL,
+          entryTile.y * C.CELL + C.CELL,
         )
         this.wrapIndicator.setVisible(true)
         return

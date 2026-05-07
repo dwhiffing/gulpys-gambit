@@ -8,8 +8,10 @@ import {
   DIRS,
   DX,
   DY,
+  FLIP_DURATION,
   PLAYER_SPEED,
   SPIN_DURATION,
+  WRAP_DELAY,
 } from '../constants'
 import type { Game } from '../scenes/Game'
 import { canMove, isWrapping, moveFrac, wrapX, wrapY } from '../utils'
@@ -23,23 +25,25 @@ export class PlayerSprite {
   moving = false
   x: number
   y: number
-  sprite: Phaser.GameObjects.Sprite
+  sprite: Phaser.Physics.Arcade.Sprite
   private dashCooldown = 0
   private dashing = false
   private dashDistanceLeft = 0
   private spinning = false
   private spinTimer = 0
+  private wrapPauseTimer = 0
+  private wrapPaused = false
   private zKey: Phaser.Input.Keyboard.Key
   constructor(private scene: Game) {
     this.tileX = scene.maze.playerSpawn.x
     this.tileY = scene.maze.playerSpawn.y
     this.dir = DIRS.LEFT
     this.nextDir = DIRS.LEFT
-    const px = this.tileX * CELL + CELL / 2
-    const py = this.tileY * CELL + CELL / 2
+    const px = this.tileX * CELL + CELL
+    const py = this.tileY * CELL + CELL
     this.x = px
     this.y = py
-    this.sprite = scene.add.sprite(px, py, 'sprites', 0).setDepth(2)
+    this.sprite = scene.physics.add.sprite(px, py, 'sprites', 0).setDepth(2)
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
     this.applyDir(this.dir)
     this.sprite.play('player-move')
@@ -49,6 +53,14 @@ export class PlayerSprite {
     this.sprite
       .setAngle(dir === DIRS.LEFT ? 0 : ANGLES[dir])
       .setFlip(dir === DIRS.LEFT, false)
+    const shift = CELL * 0.4
+    const ox = dir === DIRS.RIGHT ? shift : dir === DIRS.LEFT ? -shift : 0
+    const oy = dir === DIRS.DOWN ? shift : dir === DIRS.UP ? -shift : 0
+    ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
+      CELL * 0.4,
+      CELL * 0.6 + ox,
+      CELL * 0.6 + oy,
+    )
   }
 
   private get wrapping(): boolean {
@@ -65,10 +77,10 @@ export class PlayerSprite {
     const cols = this.grid[0].length
     const rows = this.grid.length
     const { x: fracX, y: fracY } = this.moving
-      ? moveFrac(this.tileX, this.tileY, this.dir, this.progress, cols, rows)
+      ? moveFrac(this.tileX, this.tileY, this.dir, this.progress, cols, rows, this.wrapPaused)
       : { x: this.tileX, y: this.tileY }
-    this.x = fracX * CELL + CELL / 2
-    this.y = fracY * CELL + CELL / 2
+    this.x = fracX * CELL + CELL
+    this.y = fracY * CELL + CELL
     this.sprite.setPosition(this.x, this.y)
     this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
   }
@@ -81,8 +93,8 @@ export class PlayerSprite {
     const oldDir = this.dir
     this.dir = dir
     this.spinning = true
-    this.spinTimer = SPIN_DURATION
     if (this.isFlip(oldDir, dir)) {
+      this.spinTimer = FLIP_DURATION
       this.applyDir(dir)
       this.sprite.play('player-flip')
       return
@@ -90,6 +102,7 @@ export class PlayerSprite {
     this.sprite
       .setAngle(0)
       .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
+    this.spinTimer = SPIN_DURATION
     this.sprite.play('player-spin')
   }
 
@@ -99,6 +112,30 @@ export class PlayerSprite {
 
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
     this.dashCooldown = Math.max(0, this.dashCooldown - delta)
+
+    if (this.wrapPauseTimer > 0) {
+      this.wrapPauseTimer -= delta
+      if (this.wrapPauseTimer <= 0) {
+        this.wrapPauseTimer = 0
+        this.progress = 0
+        const cols = this.grid[0].length
+        const rows = this.grid.length
+        const { x: fx, y: fy } = moveFrac(
+          this.tileX,
+          this.tileY,
+          this.dir,
+          0,
+          cols,
+          rows,
+          true,
+        )
+        this.x = fx * CELL + CELL
+        this.y = fy * CELL + CELL
+        this.sprite.setPosition(this.x, this.y)
+        this.sprite.setVisible(true)
+      }
+      return false
+    }
 
     if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
     else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
@@ -169,8 +206,18 @@ export class PlayerSprite {
 
       if (!this.wrapping && this.tryCornering(cursors)) return true
 
-      const threshold = this.wrapping ? 2 : 1
-      if (this.progress >= threshold) {
+      if (this.wrapping && !this.wrapPaused && this.progress >= 1) {
+        this.progress = 1
+        this.wrapPaused = true
+        this.wrapPauseTimer = WRAP_DELAY
+        this.sprite.setVisible(false)
+        this.updatePosition()
+        return true
+      }
+
+      if (this.progress >= (this.wrapPaused ? 2 : 1)) {
+        const threshold = this.wrapPaused ? 2 : 1
+        this.wrapPaused = false
         this.progress -= threshold
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
         this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)

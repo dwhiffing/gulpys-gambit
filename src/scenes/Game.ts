@@ -1,25 +1,21 @@
 import type { Types } from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, GHOST_STATE, TILES } from '../constants'
+import { CELL, GHOST_STATE } from '../constants'
 import { Maze } from '../maze'
 import { MAZE_CONFIG } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
 import { PlayerSprite } from '../sprites/PlayerSprite'
 import { calcZoom } from '../utils'
 
-const { EATEN, EXITING, JAILED, SCARED } = GHOST_STATE
-
-const SCATTER_DURATION = 5000
-const CHASE_DURATION = 5000
+const { EATEN, JAILED, SCARED } = GHOST_STATE
 
 export class Game extends Scene {
   maze!: Maze
-  inScatter = true
   player!: PlayerSprite
   private ghosts!: GhostSprite[]
+  private ghostGroup!: Phaser.Physics.Arcade.Group
   private cursors!: Types.Input.Keyboard.CursorKeys
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
-  private scatterTimer = SCATTER_DURATION
 
   constructor() {
     super('Game')
@@ -43,56 +39,63 @@ export class Game extends Scene {
     this.scale.setZoom(calcZoom(mazeW, mazeH))
 
     this.player = new PlayerSprite(this)
-    this.ghosts = this.maze.spawners.map(
-      (spawner, i) => new GhostSprite(this, spawner, i),
+
+    this.ghostGroup = this.physics.add.group()
+    this.ghosts = this.maze.spawners.map((spawner, i) => {
+      const g = new GhostSprite(this, spawner, i)
+      this.ghostGroup.add(g.sprite)
+      return g
+    })
+
+    // Dot overlap — fires every frame the player body touches an active dot body
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.maze.dotGroup,
+      (_player, dot) => {
+        const d = dot as Phaser.Physics.Arcade.Sprite
+        d.disableBody(true, true)
+
+        if (d.getData('power')) {
+          for (const g of this.ghosts) g.scare()
+        }
+
+        if (this.maze.dotGroup.countActive() === 0) {
+          this.gameState = 'won'
+          this.time.delayedCall(2000, () => this.scene.restart())
+        }
+      },
+    )
+
+    // Ghost overlap — process callback filters out states that don't collide
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.ghostGroup,
+      (_player, ghostSprite) => {
+        const g = (ghostSprite as Phaser.Physics.Arcade.Sprite).getData(
+          'ghost',
+        ) as GhostSprite
+        if (g.state === SCARED) {
+          g.eat()
+        } else {
+          this.killPlayer()
+        }
+      },
+      (_player, ghostSprite) => {
+        if (this.gameState !== 'playing') return false
+        const g = (ghostSprite as Phaser.Physics.Arcade.Sprite).getData(
+          'ghost',
+        ) as GhostSprite
+        return g.state !== EATEN && g.state !== JAILED
+      },
     )
   }
 
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
 
-    this.scatterTimer -= delta
-    if (this.scatterTimer <= 0) {
-      this.inScatter = !this.inScatter
-      this.scatterTimer = this.inScatter ? SCATTER_DURATION : CHASE_DURATION
-    }
-
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
     for (const g of this.ghosts) g.update(delta, blinkyPos)
-
-    const landed = this.player.update(delta, this.cursors)
-    if (landed) this.eatDot(this.player.tileX, this.player.tileY)
-
-    this.checkCollisions()
-  }
-
-  private eatDot(tx: number, ty: number) {
-    const t = this.maze.eatDot(tx, ty)
-    if (t === null) return
-
-    if (t === TILES.POWER) {
-      for (const g of this.ghosts) g.scare()
-    }
-
-    if (this.maze.dots.every((d) => !d.visible)) {
-      this.gameState = 'won'
-      this.time.delayedCall(2000, () => this.scene.restart())
-    }
-  }
-
-  private checkCollisions() {
-    for (const g of this.ghosts) {
-      if (g.state === EATEN || g.state === EXITING || g.state === JAILED)
-        continue
-      if (Math.abs(g.x - this.player.x) >= CELL * 0.7) continue
-      if (Math.abs(g.y - this.player.y) >= CELL * 0.7) continue
-
-      if (g.state === SCARED) {
-        g.eat()
-      } else {
-        this.killPlayer()
-      }
-    }
+    this.player.update(delta, this.cursors)
   }
 
   private killPlayer() {

@@ -31,8 +31,9 @@ export function moveFrac(
   progress: number,
   cols: number,
   rows: number,
+  useEntry = false,
 ): { x: number; y: number } {
-  if (isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) {
+  if ((isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) || useEntry) {
     const entryX = wrapX(tileX + DX[dir], cols)
     const entryY = wrapY(tileY + DY[dir], rows)
     return {
@@ -65,14 +66,44 @@ export function canMove(
   dir: number,
   canUseDoor: boolean,
 ): boolean {
-  const { x: nx, y: ny } = stepTile(grid, tx, ty, dir)
-  const t = grid[ny][nx]
-  if (t === TILES.WALL) return false
-  if (t === TILES.DOOR && !canUseDoor) return false
+  const cols = grid[0].length
+  const rows = grid.length
+
+  // The two leading-edge tiles that the 2×2 block would enter
+  let tiles: [number, number][]
+  if (dir === 0) {
+    // RIGHT → check column tx+2, rows ty and ty+1
+    tiles = [
+      [wrapX(tx + 2, cols), wrapY(ty, rows)],
+      [wrapX(tx + 2, cols), wrapY(ty + 1, rows)],
+    ]
+  } else if (dir === 1) {
+    // LEFT → check column tx-1, rows ty and ty+1
+    tiles = [
+      [wrapX(tx - 1, cols), wrapY(ty, rows)],
+      [wrapX(tx - 1, cols), wrapY(ty + 1, rows)],
+    ]
+  } else if (dir === 2) {
+    // UP → check row ty-1, cols tx and tx+1
+    tiles = [
+      [wrapX(tx, cols), wrapY(ty - 1, rows)],
+      [wrapX(tx + 1, cols), wrapY(ty - 1, rows)],
+    ]
+  } else {
+    // DOWN → check row ty+2, cols tx and tx+1
+    tiles = [
+      [wrapX(tx, cols), wrapY(ty + 2, rows)],
+      [wrapX(tx + 1, cols), wrapY(ty + 2, rows)],
+    ]
+  }
+
+  for (const [cx, cy] of tiles) {
+    const t = grid[cy][cx]
+    if (t === TILES.WALL) return false
+    if (t === TILES.DOOR && !canUseDoor) return false
+  }
   return true
 }
-
-export const snapOdd = (n: number) => (n % 2 === 0 ? n - 1 : n)
 
 /** Generate N visually distinct colors by spacing hues evenly around the HSL wheel. */
 export function generateGhostColors(n: number): [number, number, number][] {
@@ -111,7 +142,7 @@ export const buildZoomSteps = (
   return result
 }
 
-const ZOOM_STEPS = buildZoomSteps(0.125, 4, 2)
+const ZOOM_STEPS = buildZoomSteps(1, 4, 1)
 export const calcZoom = (w: number, h: number) => {
   const raw = Math.min(window.innerWidth / w, window.innerHeight / h)
   // return raw
