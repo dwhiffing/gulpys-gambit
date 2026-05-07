@@ -97,6 +97,7 @@ export class Game extends Scene {
     this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.03)
     this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.03)
 
+    this.maze.updateGlow(_time)
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
     for (const g of this.ghosts) g.update(delta, blinkyPos)
     this.player.update(delta, this.cursors)

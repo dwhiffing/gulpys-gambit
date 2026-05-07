@@ -18,6 +18,12 @@ export class Maze {
   readonly rows: number
   readonly spawners: Spawner[]
   readonly playerSpawn: TilePos
+  private glowContainer!: Phaser.GameObjects.Container
+  private glowSprites: Array<{
+    dot: Phaser.Physics.Arcade.Sprite
+    img: Phaser.GameObjects.Image
+    phase: number
+  }> = []
   private walls: Phaser.GameObjects.Sprite[]
 
   constructor(
@@ -32,7 +38,51 @@ export class Maze {
     this.playerSpawn = result.playerSpawn
     this.walls = []
     this.dotGroup = this.scene.physics.add.staticGroup()
+    this.createGlowTextures(scene)
+    this.glowContainer = scene.add.container(0, 0).setDepth(1)
     this.createSprites()
+  }
+
+  private createGlowTextures(scene: Phaser.Scene) {
+    for (const [key, radius, color] of [
+      ['dot-glow', CELL * 0.6, 0xaa7711],
+      ['power-glow', CELL * 0.8, 0xff8800],
+    ] as [string, number, number][]) {
+      if (scene.textures.exists(key)) continue
+      const size = Math.ceil(radius * 2)
+      const g = scene.make.graphics({ x: 0, y: 0 }, false)
+      const steps = 20
+      for (let i = steps; i >= 1; i--) {
+        const r = (i / steps) * radius
+        const a = (1 - i / steps) * 0.1
+        g.fillStyle(color, a).fillCircle(size / 2, size / 2, r)
+      }
+      g.generateTexture(key, size, size).destroy()
+    }
+  }
+
+  addDotGlow(dot: Phaser.Physics.Arcade.Sprite, power: boolean) {
+    const key = power ? 'power-glow' : 'dot-glow'
+    const img = this.scene.add
+      .image(dot.x, dot.y, key)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    this.glowContainer.add(img)
+    const phase = (dot.x + dot.y) / CELL
+    this.glowSprites.push({ dot, img, phase })
+  }
+
+  updateGlow(time: number) {
+    const speed = 0.0035
+    for (const { dot, img, phase } of this.glowSprites) {
+      if (!dot.active) {
+        if (img.visible) img.setVisible(false)
+        continue
+      }
+      const t = Math.cos(time * speed - phase) * 0.5 + 0.5
+      const lo = 0.05
+      const hi = 0.9
+      img.setAlpha(lo + Math.pow(t, 2) * (hi - lo))
+    }
   }
 
   private createSprites() {
@@ -116,6 +166,7 @@ export class Maze {
       ) as Phaser.Physics.Arcade.Sprite
       const body = sprite.body as Phaser.Physics.Arcade.StaticBody
       body.setCircle(CELL / 8).setOffset(CELL - CELL / 8, CELL - CELL / 8)
+      this.addDotGlow(sprite, power)
     }
 
     // 2×2 cell blocks
