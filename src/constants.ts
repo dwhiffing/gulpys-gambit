@@ -30,6 +30,8 @@ export const TILES = {
 export const DX = [1, -1, 0, 0]
 export const DY = [0, 0, -1, 1]
 
+export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
+
 export const GHOST_SPEED = 4
 export const GHOST_SCARED_SPEED = 1
 export const GHOST_EATEN_SPEED = 4
