@@ -43,7 +43,7 @@ export class Game extends Scene {
     this.bg = this.add
       .tileSprite(0, 0, mazeW, mazeH, 'background')
       .setOrigin(0)
-      .setAlpha(0.2)
+      .setAlpha(0.3)
       .setDepth(-1)
 
     this.bgDisplacement = this.bg
@@ -65,7 +65,7 @@ export class Game extends Scene {
       this.maze.dotGroup,
       (_player, dot) => {
         const d = dot as Phaser.Physics.Arcade.Sprite
-        d.disableBody(true, true)
+        if (!this.player.spinning) d.disableBody(true, true)
 
         if (this.maze.dotGroup.countActive() === 0) {
           this.gameState = 'won'
@@ -91,7 +91,7 @@ export class Game extends Scene {
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
 
-    const t = _time * 0.00003
+    const t = _time * 0.00002
     this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 250)
     this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 250)
     this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.03)

@@ -32,10 +32,10 @@ export class PlayerSprite {
   x: number
   y: number
   sprite: Phaser.Physics.Arcade.Sprite
+  spinning = false
   private dashCooldown = 0
   private dashing = false
   private dashDistanceLeft = 0
-  private spinning = false
   private spinTimer = 0
   private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key

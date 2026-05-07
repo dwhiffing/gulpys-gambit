@@ -8,7 +8,7 @@ export const PLAYER_SPEED = 5
 // how far through a tile (0–1) before a queued perpendicular turn snaps early
 export const SPIN_DURATION = 100
 export const FLIP_DURATION = 180
-export const CORNER_THRESHOLD = 0.75
+export const CORNER_THRESHOLD = 0.25
 export const DASH_COOLDOWN = 1000 // ms between dashes
 export const DASH_DISTANCE = 2 // tiles
 
