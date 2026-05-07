@@ -33,7 +33,10 @@ export function moveFrac(
   rows: number,
   useEntry = false,
 ): { x: number; y: number } {
-  if ((isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) || useEntry) {
+  if (
+    (isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) ||
+    useEntry
+  ) {
     const entryX = wrapX(tileX + DX[dir], cols)
     const entryY = wrapY(tileY + DY[dir], rows)
     return {
@@ -103,6 +106,20 @@ export function canMove(
     if (t === TILES.DOOR && !canUseDoor) return false
   }
   return true
+}
+
+export function wobble(
+  t: number,
+  f: [number, number, number],
+  p: [number, number, number],
+  scale: number,
+): number {
+  return (
+    (Math.sin(t * f[0] + p[0]) * 0.8 +
+      Math.sin(t * f[1] + p[1]) * 0.5 +
+      Math.sin(t * f[2] + p[2]) * 0.2) *
+    scale
+  )
 }
 
 /** Generate N visually distinct colors by spacing hues evenly around the HSL wheel. */

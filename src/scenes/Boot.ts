@@ -22,6 +22,8 @@ export class Boot extends Scene {
 
   preload() {
     this.load.setPath('assets')
+    this.load.image('background', 'background.png')
+    this.load.image('distort', 'noise.png')
     this.load.spritesheet('sprites', 'sprites.png', {
       frameWidth: CELL * 2,
       frameHeight: CELL * 2,

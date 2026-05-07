@@ -1,11 +1,12 @@
 import type { Types } from 'phaser'
+import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
 import { CELL, GHOST_STATE } from '../constants'
 import { Maze } from '../maze'
 import { MAZE_CONFIG } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
 import { PlayerSprite } from '../sprites/PlayerSprite'
-import { calcZoom } from '../utils'
+import { calcZoom, wobble } from '../utils'
 
 const { EATEN, JAILED, SCARED } = GHOST_STATE
 
@@ -15,6 +16,8 @@ export class Game extends Scene {
   private ghosts!: GhostSprite[]
   private ghostGroup!: Phaser.Physics.Arcade.Group
   private cursors!: Types.Input.Keyboard.CursorKeys
+  private bg!: Phaser.GameObjects.TileSprite
+  private bgDisplacement!: Phaser.Filters.Displacement
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
 
   constructor() {
@@ -37,6 +40,17 @@ export class Game extends Scene {
     const mazeH = this.maze.rows * CELL
     this.scale.resize(mazeW, mazeH)
     this.scale.setZoom(calcZoom(mazeW, mazeH))
+
+    this.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
+    this.bg = this.add
+      .tileSprite(0, 0, mazeW, mazeH, 'background')
+      .setOrigin(0)
+      .setAlpha(0.2)
+      .setDepth(-1)
+
+    this.bgDisplacement = this.bg
+      .enableFilters()
+      .filters!.internal.addDisplacement('distort')
 
     this.player = new PlayerSprite(this)
 
@@ -92,6 +106,12 @@ export class Game extends Scene {
 
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
+
+    const t = _time * 0.00003
+    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 250)
+    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 250)
+    this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.03)
+    this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.03)
 
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
     for (const g of this.ghosts) g.update(delta, blinkyPos)
