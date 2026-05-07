@@ -47,18 +47,14 @@ export class Boot extends Scene {
     const a = this.anims
     const def = (
       key: string,
-      textureKey: string,
-      frames: number[],
+      tex: string,
+      frameIndicies: number[],
       rate: number,
       loop: boolean,
     ) => {
+      const frames = a.generateFrameNumbers(tex, { frames: frameIndicies })
       if (!a.exists(key))
-        a.create({
-          key,
-          frames: a.generateFrameNumbers(textureKey, { frames }),
-          frameRate: rate,
-          repeat: loop ? -1 : 0,
-        })
+        a.create({ key, frames, frameRate: rate, repeat: loop ? -1 : 0 })
     }
     def('player-move', 'sprites', [6, 7], 6, true)
     def('player-spin', 'sprites', [8], 0, false)

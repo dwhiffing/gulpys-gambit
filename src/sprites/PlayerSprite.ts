@@ -11,10 +11,16 @@ import {
   FLIP_DURATION,
   PLAYER_SPEED,
   SPIN_DURATION,
-  WRAP_DELAY,
 } from '../constants'
 import type { Game } from '../scenes/Game'
-import { canMove, isWrapping, moveFrac, wrapX, wrapY } from '../utils'
+import {
+  WrapHelper,
+  canMove,
+  isWrapping,
+  moveFrac,
+  wrapX,
+  wrapY,
+} from '../utils'
 
 export class PlayerSprite {
   tileX: number
@@ -31,8 +37,7 @@ export class PlayerSprite {
   private dashDistanceLeft = 0
   private spinning = false
   private spinTimer = 0
-  private wrapPauseTimer = 0
-  private wrapPaused = false
+  private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key
   constructor(private scene: Game) {
     this.tileX = scene.maze.playerSpawn.x
@@ -74,10 +79,8 @@ export class PlayerSprite {
   }
 
   private updatePosition() {
-    const cols = this.grid[0].length
-    const rows = this.grid.length
     const { x: fracX, y: fracY } = this.moving
-      ? moveFrac(this.tileX, this.tileY, this.dir, this.progress, cols, rows, this.wrapPaused)
+      ? moveFrac(this, this.progress, this.wrap.active)
       : { x: this.tileX, y: this.tileY }
     this.x = fracX * CELL + CELL
     this.y = fracY * CELL + CELL
@@ -113,29 +116,7 @@ export class PlayerSprite {
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
     this.dashCooldown = Math.max(0, this.dashCooldown - delta)
 
-    if (this.wrapPauseTimer > 0) {
-      this.wrapPauseTimer -= delta
-      if (this.wrapPauseTimer <= 0) {
-        this.wrapPauseTimer = 0
-        this.progress = 0
-        const cols = this.grid[0].length
-        const rows = this.grid.length
-        const { x: fx, y: fy } = moveFrac(
-          this.tileX,
-          this.tileY,
-          this.dir,
-          0,
-          cols,
-          rows,
-          true,
-        )
-        this.x = fx * CELL + CELL
-        this.y = fy * CELL + CELL
-        this.sprite.setPosition(this.x, this.y)
-        this.sprite.setVisible(true)
-      }
-      return false
-    }
+    if (this.wrap.tick(delta, this)) return false
 
     if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
     else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
@@ -156,7 +137,11 @@ export class PlayerSprite {
 
     const wasMoving = this.moving
 
-    if (Phaser.Input.Keyboard.JustDown(this.zKey) && this.dashCooldown === 0) {
+    if (
+      Phaser.Input.Keyboard.JustDown(this.zKey) &&
+      !this.dashing &&
+      this.dashCooldown === 0
+    ) {
       const tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
       const tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
       const tileOpen = canMove(this.grid, tileX, tileY, this.dir, false)
@@ -206,19 +191,20 @@ export class PlayerSprite {
 
       if (!this.wrapping && this.tryCornering(cursors)) return true
 
-      if (this.wrapping && !this.wrapPaused && this.progress >= 1) {
-        this.progress = 1
-        this.wrapPaused = true
-        this.wrapPauseTimer = WRAP_DELAY
+      if (this.wrapping && !this.wrap.active && this.progress >= 2) {
+        this.progress = 2
+        this.wrap.trigger()
         this.sprite.setVisible(false)
         this.updatePosition()
         return true
       }
 
-      if (this.progress >= (this.wrapPaused ? 2 : 1)) {
-        const threshold = this.wrapPaused ? 2 : 1
-        this.wrapPaused = false
-        this.progress -= threshold
+      if (
+        (!this.wrapping || this.wrap.active) &&
+        this.progress >= this.wrap.threshold
+      ) {
+        this.progress -= this.wrap.threshold
+        this.wrap.active = false
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
         this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
 

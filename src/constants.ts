@@ -10,7 +10,7 @@ export const SPIN_DURATION = 100
 export const FLIP_DURATION = 180
 export const CORNER_THRESHOLD = 0.75
 export const DASH_COOLDOWN = 1000 // ms between dashes
-export const DASH_DISTANCE = 1 // tiles
+export const DASH_DISTANCE = 2 // tiles
 
 export const DIRS = {
   RIGHT: 0,
@@ -33,15 +33,4 @@ export const DY = [0, 0, -1, 1]
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
 
 export const GHOST_SPEED = 4
-export const GHOST_SCARED_SPEED = 1
-export const GHOST_EATEN_SPEED = 4
 export const POWER_DURATION = 8000
-export const SCARED_WARN = 2000
-
-export const GHOST_STATE = {
-  CHASE: 0,
-  SCARED: 1,
-  EATEN: 2,
-  EXITING: 3,
-  JAILED: 4,
-} as const

@@ -2,8 +2,6 @@
  * Maze generation configuration — edit MAZE_CONFIG to tune generation.
  */
 
-import { generateGhostColors } from './utils'
-
 /** How the generated half-maze is reflected to fill the full grid. */
 export type MazeSymmetry =
   | 'none' // fully random, no mirroring
@@ -45,7 +43,11 @@ export const MAZE_CONFIG: MazeConfig = {
   loopFactor: 0.2,
   wraps: { x: 2, y: 1 },
   ghostCount: 1,
-  powerCount: 0,
+  powerCount: 4,
 }
 
-export const GHOST_COLORS: [number, number, number][] = generateGhostColors(4)
+export const GHOST_COLORS: [number, number, number][] = [
+  [0xff, 0x00, 0x00], // red
+  [0xff, 0xa5, 0x00], // orange
+  [0xff, 0xff, 0x00], // yellow
+]

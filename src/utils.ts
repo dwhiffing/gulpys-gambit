@@ -1,4 +1,4 @@
-import { DX, DY, TILES } from './constants'
+import { CELL, DX, DY, TILES, WRAP_DELAY } from './constants'
 
 export function wrapX(x: number, cols: number): number {
   if (x < 0) return cols - 1
@@ -24,19 +24,26 @@ export function isWrapping(
   return nx < 0 || nx >= cols || ny < 0 || ny >= rows
 }
 
+interface Entity {
+  tileX: number
+  tileY: number
+  dir: number
+  grid: number[][]
+  progress: number
+  sprite: {
+    setPosition(x: number, y: number): void
+    setVisible(v: boolean): void
+  }
+}
 export function moveFrac(
-  tileX: number,
-  tileY: number,
-  dir: number,
+  host: Entity,
   progress: number,
-  cols: number,
-  rows: number,
   useEntry = false,
 ): { x: number; y: number } {
-  if (
-    (isWrapping(tileX, tileY, dir, cols, rows) && progress >= 1) ||
-    useEntry
-  ) {
+  const { tileX, tileY, dir, grid } = host
+  const cols = grid[0].length
+  const rows = grid.length
+  if (useEntry) {
     const entryX = wrapX(tileX + DX[dir], cols)
     const entryY = wrapY(tileY + DY[dir], rows)
     return {
@@ -47,18 +54,6 @@ export function moveFrac(
   return {
     x: tileX + DX[dir] * progress,
     y: tileY + DY[dir] * progress,
-  }
-}
-
-export function stepTile(
-  grid: number[][],
-  x: number,
-  y: number,
-  dir: number,
-): { x: number; y: number } {
-  return {
-    x: wrapX(x + DX[dir], grid[0].length),
-    y: wrapY(y + DY[dir], grid.length),
   }
 }
 
@@ -108,6 +103,34 @@ export function canMove(
   return true
 }
 
+export class WrapHelper {
+  private timer = 0
+  active = false
+
+  get threshold() {
+    return this.active ? 2 : 1
+  }
+
+  trigger() {
+    this.active = true
+    this.timer = WRAP_DELAY
+  }
+
+  /** Returns true while the pause is still ticking (caller should return early). */
+  tick(delta: number, host: Entity): boolean {
+    if (this.timer <= 0) return false
+    this.timer -= delta
+    if (this.timer <= 0) {
+      this.timer = 0
+      host.progress = 0
+      const { x: fx, y: fy } = moveFrac(host, 0, true)
+      host.sprite.setPosition(fx * CELL + CELL, fy * CELL + CELL)
+      host.sprite.setVisible(true)
+    }
+    return true
+  }
+}
+
 export function wobble(
   t: number,
   f: [number, number, number],
@@ -120,20 +143,6 @@ export function wobble(
       Math.sin(t * f[2] + p[2]) * 0.2) *
     scale
   )
-}
-
-/** Generate N visually distinct colors by spacing hues evenly around the HSL wheel. */
-export function generateGhostColors(n: number): [number, number, number][] {
-  return Array.from({ length: n }, (_, i) => {
-    const h = (i / n) * 360
-    // HSL(h, 100%, 60%) → RGB via CSS
-    const ch = `hsl(${h},100%,60%)`
-    const ctx = document.createElement('canvas').getContext('2d')!
-    ctx.fillStyle = ch
-    const hex = ctx.fillStyle as string // browser normalises to #rrggbb
-    const v = parseInt(hex.slice(1), 16)
-    return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff]
-  })
 }
 
 export const buildZoomSteps = (

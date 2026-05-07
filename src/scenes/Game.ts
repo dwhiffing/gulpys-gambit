@@ -1,14 +1,12 @@
 import type { Types } from 'phaser'
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, GHOST_STATE } from '../constants'
+import { CELL } from '../constants'
 import { Maze } from '../maze'
 import { MAZE_CONFIG } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
 import { PlayerSprite } from '../sprites/PlayerSprite'
 import { calcZoom, wobble } from '../utils'
-
-const { EATEN, JAILED, SCARED } = GHOST_STATE
 
 export class Game extends Scene {
   maze!: Maze
@@ -69,10 +67,6 @@ export class Game extends Scene {
         const d = dot as Phaser.Physics.Arcade.Sprite
         d.disableBody(true, true)
 
-        if (d.getData('power')) {
-          for (const g of this.ghosts) g.scare()
-        }
-
         if (this.maze.dotGroup.countActive() === 0) {
           this.gameState = 'won'
           this.time.delayedCall(2000, () => this.scene.restart())
@@ -84,22 +78,12 @@ export class Game extends Scene {
     this.physics.add.overlap(
       this.player.sprite,
       this.ghostGroup,
-      (_player, ghostSprite) => {
-        const g = (ghostSprite as Phaser.Physics.Arcade.Sprite).getData(
-          'ghost',
-        ) as GhostSprite
-        if (g.state === SCARED) {
-          g.eat()
-        } else {
-          this.killPlayer()
-        }
+      (_player, _ghostSprite) => {
+        this.killPlayer()
       },
-      (_player, ghostSprite) => {
+      (_player, _ghostSprite) => {
         if (this.gameState !== 'playing') return false
-        const g = (ghostSprite as Phaser.Physics.Arcade.Sprite).getData(
-          'ghost',
-        ) as GhostSprite
-        return g.state !== EATEN && g.state !== JAILED
+        return true
       },
     )
   }
@@ -121,7 +105,6 @@ export class Game extends Scene {
   private killPlayer() {
     this.gameState = 'dying'
     this.player.die()
-    for (const g of this.ghosts) g.hide()
     this.time.delayedCall(1000, () => this.scene.restart())
   }
 }

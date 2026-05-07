@@ -114,7 +114,6 @@ export class Maze {
         'dots',
         frame,
       ) as Phaser.Physics.Arcade.Sprite
-      sprite.setData('power', power)
       const body = sprite.body as Phaser.Physics.Arcade.StaticBody
       body.setCircle(CELL / 8).setOffset(CELL - CELL / 8, CELL - CELL / 8)
     }
