@@ -66,10 +66,12 @@ export class PlayerSprite {
     this.createEatEffects()
 
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
-    scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M).on('down', () => {
-      this.muted = !this.muted
-      localStorage.setItem('muted', String(this.muted))
-    })
+    scene.input
+      .keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M)
+      .on('down', () => {
+        this.muted = !this.muted
+        localStorage.setItem('muted', String(this.muted))
+      })
     this.applyDir(this.dir)
     this.sprite.play('player-move')
   }
@@ -158,7 +160,8 @@ export class PlayerSprite {
     }
 
     if (this.cornerLerp < 1) {
-      const val = this.cornerLerp + (PLAYER_SPEED * delta) / 1000
+      const CORNER_SPEED = 0.75
+      const val = this.cornerLerp + (PLAYER_SPEED * delta * CORNER_SPEED) / 1000
       this.cornerLerp = Math.min(1, val)
     }
 
@@ -230,8 +233,12 @@ export class PlayerSprite {
 
     if (heldDir === -1 || heldDir === this.dir) return false
 
-    const destX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
-    const destY = wrapY(this.tileY + DY[this.dir], this.grid.length)
+    const { dx, dy } = this.mouthDir
+    const REACH = 1
+    const mouthX = Math.round((this.x + dx * CELL * REACH - CELL) / CELL)
+    const mouthY = Math.round((this.y + dy * CELL * REACH - CELL) / CELL)
+    const destX = wrapX(mouthX, this.grid[0].length)
+    const destY = wrapY(mouthY, this.grid.length)
     if (!canMove(this.grid, destX, destY, heldDir, false)) return false
 
     const { x: fracX, y: fracY } = moveFrac(this, this.progress, false)
@@ -256,9 +263,9 @@ export class PlayerSprite {
   }
 
   private updateBodyCircle() {
-    const radius = this.spinning ? CELL * 0.6 : CELL * 0.4
+    const radius = this.spinning ? CELL * 0.7 : CELL * 0.4
     const { dx, dy } = this.mouthDir
-    const shift = CELL * 0.3
+    const shift = CELL * 0.55
     const offset = CELL - radius
     ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
       radius,
@@ -271,7 +278,9 @@ export class PlayerSprite {
     const { x: fracX, y: fracY } = this.moving
       ? moveFrac(this, this.progress, this.wrap.active)
       : { x: this.tileX, y: this.tileY }
-    const arc = (1 + Math.cos(this.cornerLerp * Math.PI)) / 2
+    const arc =
+      (1 + Math.cos(this.cornerLerp * Math.PI)) / 2 -
+      Math.sin(this.cornerLerp * Math.PI) * 0.2
     this.x = fracX * CELL + CELL + this.cornerX * arc
     this.y = fracY * CELL + CELL + this.cornerY * arc
     this.sprite.setPosition(this.x, this.y)

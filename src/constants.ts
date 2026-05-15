@@ -31,6 +31,6 @@ export const DX = [1, -1, 0, 0]
 export const DY = [0, 0, -1, 1]
 
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
-export const DOT_EFFECT_INTERVAL = 120 // ms between dot flash/particle/glow effects
+export const DOT_EFFECT_INTERVAL = 170 // ms between dot flash/particle/glow effects
 
 export const GHOST_SPEED = 2.5

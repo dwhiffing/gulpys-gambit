@@ -61,8 +61,8 @@ export class Boot extends Scene {
         a.create({ key, frames, frameRate: rate, repeat: loop ? -1 : 0 })
     }
     def('player-move', 'player', [0, 1], 6, true)
-    def('player-spin', 'player', [6, 7, 8, 9], 15, false)
-    def('player-spin-2', 'player', [9, 8, 7, 6], 15, false)
+    def('player-spin', 'player', [6, 7, 8, 9], 11, false)
+    def('player-spin-2', 'player', [9, 8, 7, 6], 11, false)
     def('player-flip', 'player', [3], 0, false)
     def('player-die', 'player', [4, 5], 6, true)
     def('fish-1', 'sprites', [0, 1], 2, true)
