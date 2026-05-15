@@ -24,6 +24,10 @@ export class Boot extends Scene {
     this.load.setPath('assets')
     this.load.image('background', 'background.png')
     this.load.image('distort', 'noise.png')
+    this.load.spritesheet('player', 'player.png', {
+      frameWidth: CELL * 2,
+      frameHeight: CELL * 2,
+    })
     this.load.spritesheet('sprites', 'sprites.png', {
       frameWidth: CELL * 2,
       frameHeight: CELL * 2,
@@ -56,15 +60,15 @@ export class Boot extends Scene {
       if (!a.exists(key))
         a.create({ key, frames, frameRate: rate, repeat: loop ? -1 : 0 })
     }
-    def('player-move', 'sprites', [6, 7], 6, true)
-    def('player-spin', 'sprites', [8], 0, false)
-    def('player-flip', 'sprites', [9], 0, false)
-    def('player-die', 'sprites', [10, 11], 6, true)
+    def('player-move', 'player', [0, 1], 6, true)
+    def('player-spin', 'player', [2], 0, false)
+    def('player-flip', 'player', [3], 0, false)
+    def('player-die', 'player', [4, 5], 6, true)
     def('fish-1', 'sprites', [0, 1], 2, true)
     def('fish-2', 'sprites', [2, 3], 2, true)
     def('fish-3', 'sprites', [4, 5], 2, true)
-    def('fish-4', 'sprites', [12, 13], 2, true)
-    def('fish-5', 'sprites', [14, 15], 2, true)
-    def('fish-6', 'sprites', [16, 17], 2, true)
+    def('fish-4', 'sprites', [6, 7], 2, true)
+    def('fish-5', 'sprites', [8, 9], 2, true)
+    def('fish-6', 'sprites', [10, 11], 2, true)
   }
 }
