@@ -14,10 +14,10 @@ import {
 } from '../constants'
 import type { Game } from '../scenes/Game'
 import {
-  WrapHelper,
   canMove,
   isWrapping,
   moveFrac,
+  WrapHelper,
   wrapX,
   wrapY,
 } from '../utils'
@@ -54,63 +54,13 @@ export class PlayerSprite {
     this.sprite.play('player-move')
   }
 
-  private applyDir(dir: number) {
-    this.sprite
-      .setAngle(dir === DIRS.LEFT ? 0 : ANGLES[dir])
-      .setFlip(dir === DIRS.LEFT, false)
-    const shift = CELL * 0.4
-    const ox = dir === DIRS.RIGHT ? shift : dir === DIRS.LEFT ? -shift : 0
-    const oy = dir === DIRS.DOWN ? shift : dir === DIRS.UP ? -shift : 0
-    ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
-      CELL * 0.4,
-      CELL * 0.6 + ox,
-      CELL * 0.6 + oy,
-    )
-  }
-
-  private get wrapping(): boolean {
-    return isWrapping(
-      this.tileX,
-      this.tileY,
-      this.dir,
-      this.grid[0].length,
-      this.grid.length,
-    )
-  }
-
-  private updatePosition() {
-    const { x: fracX, y: fracY } = this.moving
-      ? moveFrac(this, this.progress, this.wrap.active)
-      : { x: this.tileX, y: this.tileY }
-    this.x = fracX * CELL + CELL
-    this.y = fracY * CELL + CELL
-    this.sprite.setPosition(this.x, this.y)
-    this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
-  }
-
-  private isFlip(a: number, b: number): boolean {
-    return (a ^ b) === 1
-  }
-
-  private turnTo(dir: number) {
-    const oldDir = this.dir
-    this.dir = dir
-    this.spinning = true
-    if (this.isFlip(oldDir, dir)) {
-      this.spinTimer = FLIP_DURATION
-      this.applyDir(dir)
-      this.sprite.play('player-flip')
-      return
-    }
-    this.sprite
-      .setAngle(0)
-      .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
-    this.spinTimer = SPIN_DURATION
-    this.sprite.play('player-spin')
-  }
-
   get grid() {
     return this.scene.maze.grid
+  }
+
+  die() {
+    this.spinning = false
+    this.sprite.setAngle(0).setFlipX(false).play('player-die')
   }
 
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
@@ -258,8 +208,63 @@ export class PlayerSprite {
     return true
   }
 
-  die() {
-    this.spinning = false
-    this.sprite.setAngle(0).setFlipX(false).play('player-die')
+  private applyDir(dir: number) {
+    this.sprite
+      .setAngle(dir === DIRS.LEFT ? 0 : ANGLES[dir])
+      .setFlip(dir === DIRS.LEFT, false)
+    const shift = CELL * 0.4
+    const ox = dir === DIRS.RIGHT ? shift : dir === DIRS.LEFT ? -shift : 0
+    const oy = dir === DIRS.DOWN ? shift : dir === DIRS.UP ? -shift : 0
+    ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
+      CELL * 0.4,
+      CELL * 0.6 + ox,
+      CELL * 0.6 + oy,
+    )
+  }
+
+  private updatePosition() {
+    const { x: fracX, y: fracY } = this.moving
+      ? moveFrac(this, this.progress, this.wrap.active)
+      : { x: this.tileX, y: this.tileY }
+    this.x = fracX * CELL + CELL
+    this.y = fracY * CELL + CELL
+    this.sprite.setPosition(this.x, this.y)
+    this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
+    this.tintOverlay
+      .setPosition(this.x, this.y)
+      .setAngle(this.sprite.angle)
+      .setFlip(this.sprite.flipX, this.sprite.flipY)
+  }
+
+  private isFlip(a: number, b: number): boolean {
+    return (a ^ b) === 1
+  }
+
+  private turnTo(dir: number) {
+    const oldDir = this.dir
+    this.dir = dir
+    this.spinning = true
+    if (this.isFlip(oldDir, dir)) {
+      this.spinTimer = FLIP_DURATION
+      this.applyDir(dir)
+      this.sprite.play('player-flip')
+      return
+    }
+    this.sprite
+      .setAngle(0)
+      .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
+    this.spinTimer = SPIN_DURATION
+    this.sprite.play('player-spin')
+  }
+
+  private get wrapping(): boolean {
+    return isWrapping(
+      this.tileX,
+      this.tileY,
+      this.dir,
+      this.grid[0].length,
+      this.grid.length,
+    )
+  }
   }
 }
