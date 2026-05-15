@@ -1,7 +1,7 @@
 import type { Types } from 'phaser'
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL } from '../constants'
+import { CELL, TIMESCALE } from '../constants'
 import { Maze } from '../maze'
 import { MAZE_CONFIG } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
@@ -98,9 +98,10 @@ export class Game extends Scene {
     this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
 
     this.maze.updateGlow(_time)
+    const scaledDelta = delta * TIMESCALE
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
-    for (const g of this.ghosts) g.update(delta, blinkyPos)
-    this.player.update(delta, this.cursors)
+    for (const g of this.ghosts) g.update(scaledDelta, blinkyPos)
+    this.player.update(scaledDelta, this.cursors)
   }
 
   private killPlayer() {

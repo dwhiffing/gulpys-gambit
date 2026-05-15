@@ -1,5 +1,6 @@
 /** Native pixel size of one tile — sprites are 16×16 */
 export const CELL = 16
+export const TIMESCALE = 1
 
 export const ANGLES = [0, 180, -90, 90]
 
