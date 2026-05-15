@@ -43,7 +43,7 @@ export class Game extends Scene {
     this.bg = this.add
       .tileSprite(0, 0, mazeW, mazeH, 'background')
       .setOrigin(0)
-      .setAlpha(0.3)
+      .setAlpha(0.2)
       .setDepth(-1)
 
     this.bgDisplacement = this.bg
@@ -91,11 +91,11 @@ export class Game extends Scene {
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
 
-    const t = _time * 0.00002
-    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 250)
-    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 250)
-    this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.03)
-    this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.03)
+    const t = _time * 0.00004
+    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 200)
+    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 200)
+    this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.1)
+    this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
 
     this.maze.updateGlow(_time)
     const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
