@@ -6,6 +6,7 @@ import {
   DASH_COOLDOWN,
   DASH_DISTANCE,
   DIRS,
+  DOT_EFFECT_INTERVAL,
   DX,
   DY,
   FLIP_DURATION,
@@ -32,6 +33,8 @@ export class PlayerSprite {
   x: number
   y: number
   sprite: Phaser.Physics.Arcade.Sprite
+  private glow!: Phaser.Filters.Glow
+  private tintOverlay!: Phaser.GameObjects.Sprite
   spinning = false
   private dashCooldown = 0
   private dashing = false
@@ -39,6 +42,13 @@ export class PlayerSprite {
   private spinTimer = 0
   private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key
+  private dotParticles!: Phaser.GameObjects.Particles.ParticleEmitter
+  private audioCtx!: AudioContext
+  private muted = localStorage.getItem('muted') === 'true'
+  private eatToggle = 0
+  private dotQueue = 0
+  private dotQueueTimer = 0
+
   constructor(private scene: Game) {
     this.tileX = scene.maze.playerSpawn.x
     this.tileY = scene.maze.playerSpawn.y
@@ -49,13 +59,24 @@ export class PlayerSprite {
     this.x = px
     this.y = py
     this.sprite = scene.physics.add.sprite(px, py, 'sprites', 0).setDepth(2)
+    this.audioCtx = new AudioContext()
+    this.createEatEffects()
+
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
+    scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M).on('down', () => {
+      this.muted = !this.muted
+      localStorage.setItem('muted', String(this.muted))
+    })
     this.applyDir(this.dir)
     this.sprite.play('player-move')
   }
 
   get grid() {
     return this.scene.maze.grid
+  }
+
+  collectDot() {
+    this.dotQueue++
   }
 
   die() {
@@ -65,7 +86,12 @@ export class PlayerSprite {
 
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
     this.dashCooldown = Math.max(0, this.dashCooldown - delta)
-
+    this.dotQueueTimer = Math.max(0, this.dotQueueTimer - delta)
+    if (this.dotQueue > 0 && this.dotQueueTimer === 0) {
+      this.dotQueue--
+      this.dotQueueTimer = DOT_EFFECT_INTERVAL
+      this.processDotEat()
+    }
     if (this.wrap.tick(delta, this)) return false
 
     if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
@@ -266,5 +292,103 @@ export class PlayerSprite {
       this.grid.length,
     )
   }
+
+  private get angle() {
+    return Math.atan2(-DY[this.dir], -DX[this.dir])
   }
+
+  private get mouthPosition() {
+    const reach = CELL * 1.2
+    return {
+      x: this.x + DX[this.dir] * reach,
+      y: this.y + DY[this.dir] * reach,
+    }
+  }
+
+  private createEatEffects() {
+    this.glow = this.sprite
+      .enableFilters()
+      .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)
+    this.tintOverlay = this.scene.add
+      .sprite(this.x, this.y, 'player', 0)
+      .setDepth(3)
+      .setTint(0xff7700)
+      .setTintMode(Phaser.TintModes.FILL)
+      .setAlpha(0)
+
+    this.dotParticles = this.scene.add
+      .particles(0, 0, 'dots', {
+        frame: 2,
+        scale: { start: 1, end: 0 },
+        lifespan: { min: 300, max: 600 },
+        emitting: false,
+      })
+      .setDepth(-1)
+
+    this.scene.tweens.killTweensOf(this.glow).add({
+      targets: this.glow,
+      outerStrength: { from: 0.5, to: 1.5 },
+      duration: 800,
+      yoyo: true,
+      ease: 'sine.inOut',
+      repeat: -1,
+    })
+  }
+
+  private processDotEat() {
+    this.playEatSound()
+    this.fireEatParticles()
+    this.scene.tweens.killTweensOf(this.tintOverlay).add({
+      targets: this.tintOverlay,
+      alpha: { from: 0, to: 0.5 },
+      duration: DOT_EFFECT_INTERVAL,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+    })
+  }
+
+  private fireEatParticles() {
+    const { x, y } = this.mouthPosition
+    const count = 5 + Math.floor(Math.random() * 3)
+    for (let i = 0; i < count; i++) {
+      const angle = this.angle + Math.PI + (Math.random() - 0.5) * (Math.PI / 2)
+      const speed = 20 + Math.random() * 40
+      const p = this.dotParticles.emitParticleAt(x, y, 1)
+      if (p) {
+        p.velocityX = Math.cos(angle) * speed
+        p.velocityY = Math.sin(angle) * speed
+      }
+    }
+  }
+
+  private playEatSound() {
+    if (this.muted) return
+    const jitter = 1 + (Math.random() - 0.5) * 0.08
+    const freq = (this.eatToggle === 0 ? 320 : 220) * jitter
+    this.eatToggle = 1 - this.eatToggle
+    eatSound(this.audioCtx, freq * 1.2, freq * 0.2, 0.1, 0.06)
+  }
+}
+
+const eatSound = (
+  ac: AudioContext,
+  startFreq: number,
+  endFreq: number,
+  dur: number,
+  vol: number,
+) => {
+  const osc = ac.createOscillator()
+  const gain = ac.createGain()
+  const now = ac.currentTime
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(startFreq, now)
+  osc.frequency.exponentialRampToValueAtTime(endFreq, now + dur)
+  osc.connect(gain)
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(vol, now + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+  gain.gain.setValueAtTime(0, now + dur + 0.002)
+  osc.start(now)
+  osc.stop(now + dur + 0.003)
+  gain.connect(ac.destination)
 }
