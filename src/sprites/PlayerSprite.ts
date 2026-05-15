@@ -2,7 +2,6 @@ import * as Phaser from 'phaser'
 import {
   ANGLES,
   CELL,
-  CORNER_THRESHOLD,
   DASH_COOLDOWN,
   DASH_DISTANCE,
   DIRS,
@@ -40,6 +39,10 @@ export class PlayerSprite {
   private dashing = false
   private dashDistanceLeft = 0
   private spinTimer = 0
+  private cornerX = 0
+  private cornerY = 0
+  private cornerLerp = 1
+  private cornerDir = 0
   private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key
   private dotParticles!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -154,6 +157,11 @@ export class PlayerSprite {
       }
     }
 
+    if (this.cornerLerp < 1) {
+      const val = this.cornerLerp + (PLAYER_SPEED * delta) / 1000
+      this.cornerLerp = Math.min(1, val)
+    }
+
     if (this.moving) {
       const moveStep = (PLAYER_SPEED * delta) / 1000
       if (this.dashing) {
@@ -208,7 +216,7 @@ export class PlayerSprite {
   private tryCornering(
     cursors: Phaser.Types.Input.Keyboard.CursorKeys,
   ): boolean {
-    if (this.progress < CORNER_THRESHOLD || this.progress >= 1) return false
+    if (this.progress >= 1) return false
 
     const heldDir = cursors.right.isDown
       ? DIRS.RIGHT
@@ -226,11 +234,18 @@ export class PlayerSprite {
     const destY = wrapY(this.tileY + DY[this.dir], this.grid.length)
     if (!canMove(this.grid, destX, destY, heldDir, false)) return false
 
+    const { x: fracX, y: fracY } = moveFrac(this, this.progress, false)
+    this.cornerDir = this.dir
+    this.cornerX = fracX * CELL + CELL - (destX * CELL + CELL)
+    this.cornerY = fracY * CELL + CELL - (destY * CELL + CELL)
+    this.cornerLerp = 0
+
     this.tileX = destX
     this.tileY = destY
     this.progress = 0
     this.turnTo(heldDir)
     this.nextDir = heldDir
+
     return true
   }
 
@@ -238,13 +253,17 @@ export class PlayerSprite {
     this.sprite
       .setAngle(dir === DIRS.LEFT ? 0 : ANGLES[dir])
       .setFlip(dir === DIRS.LEFT, false)
-    const shift = CELL * 0.4
-    const ox = dir === DIRS.RIGHT ? shift : dir === DIRS.LEFT ? -shift : 0
-    const oy = dir === DIRS.DOWN ? shift : dir === DIRS.UP ? -shift : 0
+  }
+
+  private updateBodyCircle() {
+    const radius = this.spinning ? CELL * 0.6 : CELL * 0.4
+    const { dx, dy } = this.mouthDir
+    const shift = CELL * 0.3
+    const offset = CELL - radius
     ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
-      CELL * 0.4,
-      CELL * 0.6 + ox,
-      CELL * 0.6 + oy,
+      radius,
+      offset + dx * shift,
+      offset + dy * shift,
     )
   }
 
@@ -252,14 +271,17 @@ export class PlayerSprite {
     const { x: fracX, y: fracY } = this.moving
       ? moveFrac(this, this.progress, this.wrap.active)
       : { x: this.tileX, y: this.tileY }
-    this.x = fracX * CELL + CELL
-    this.y = fracY * CELL + CELL
+    const arc = (1 + Math.cos(this.cornerLerp * Math.PI)) / 2
+    this.x = fracX * CELL + CELL + this.cornerX * arc
+    this.y = fracY * CELL + CELL + this.cornerY * arc
     this.sprite.setPosition(this.x, this.y)
+    this.updateBodyCircle()
     this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
     this.tintOverlay
       .setPosition(this.x, this.y)
       .setAngle(this.sprite.angle)
       .setFlip(this.sprite.flipX, this.sprite.flipY)
+      .setFrame(this.sprite.frame.name)
   }
 
   private isFlip(a: number, b: number): boolean {
@@ -280,7 +302,8 @@ export class PlayerSprite {
       .setAngle(0)
       .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
     this.spinTimer = SPIN_DURATION
-    this.sprite.play('player-spin')
+    if (this.dir === 0 || this.dir === 1) this.sprite.play('player-spin-2')
+    else this.sprite.play('player-spin')
   }
 
   private get wrapping(): boolean {
@@ -293,15 +316,26 @@ export class PlayerSprite {
     )
   }
 
+  private get mouthDir(): { dx: number; dy: number } {
+    const t = (1 - Math.cos(this.cornerLerp * Math.PI)) / 2
+    const lerp = (a: number, b: number) => a + (b - a) * t
+    return {
+      dx: lerp(DX[this.cornerDir], DX[this.dir]),
+      dy: lerp(DY[this.cornerDir], DY[this.dir]),
+    }
+  }
+
   private get angle() {
-    return Math.atan2(-DY[this.dir], -DX[this.dir])
+    const { dx, dy } = this.mouthDir
+    return Math.atan2(-dy, -dx)
   }
 
   private get mouthPosition() {
+    const { dx, dy } = this.mouthDir
     const reach = CELL * 1.2
     return {
-      x: this.x + DX[this.dir] * reach,
-      y: this.y + DY[this.dir] * reach,
+      x: this.x + dx * reach,
+      y: this.y + dy * reach,
     }
   }
 
@@ -323,7 +357,7 @@ export class PlayerSprite {
         lifespan: { min: 300, max: 600 },
         emitting: false,
       })
-      .setDepth(-1)
+      .setDepth(2)
 
     this.scene.tweens.killTweensOf(this.glow).add({
       targets: this.glow,
@@ -340,16 +374,15 @@ export class PlayerSprite {
     this.fireEatParticles()
     this.scene.tweens.killTweensOf(this.tintOverlay).add({
       targets: this.tintOverlay,
-      alpha: { from: 0, to: 0.5 },
+      alpha: { from: 0.5, to: 0 },
       duration: DOT_EFFECT_INTERVAL,
       ease: 'Sine.easeInOut',
-      yoyo: true,
     })
   }
 
   private fireEatParticles() {
     const { x, y } = this.mouthPosition
-    const count = 5 + Math.floor(Math.random() * 3)
+    const count = 1 + Math.floor(Math.random() * 2)
     for (let i = 0; i < count; i++) {
       const angle = this.angle + Math.PI + (Math.random() - 0.5) * (Math.PI / 2)
       const speed = 20 + Math.random() * 40

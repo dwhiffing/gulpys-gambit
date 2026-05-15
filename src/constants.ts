@@ -1,15 +1,14 @@
 /** Native pixel size of one tile — sprites are 16×16 */
 export const CELL = 16
-export const TIMESCALE = 0.25
+export const TIMESCALE = 1
 
 export const ANGLES = [0, 180, -90, 90]
 
 // player speed
-export const PLAYER_SPEED = 4
+export const PLAYER_SPEED = 3
 // how far through a tile (0–1) before a queued perpendicular turn snaps early
-export const SPIN_DURATION = 80
-export const FLIP_DURATION = 180
-export const CORNER_THRESHOLD = 0.25
+export const SPIN_DURATION = 200
+export const FLIP_DURATION = 120
 export const DASH_COOLDOWN = 1000 // ms between dashes
 export const DASH_DISTANCE = 2 // tiles
 
@@ -32,7 +31,6 @@ export const DX = [1, -1, 0, 0]
 export const DY = [0, 0, -1, 1]
 
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
-export const DOT_EFFECT_INTERVAL = 150 // ms between dot flash/particle/glow effects
+export const DOT_EFFECT_INTERVAL = 120 // ms between dot flash/particle/glow effects
 
-export const GHOST_SPEED = 4
-export const POWER_DURATION = 8000
+export const GHOST_SPEED = 2.5

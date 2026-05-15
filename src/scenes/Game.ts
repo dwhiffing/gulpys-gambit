@@ -65,10 +65,8 @@ export class Game extends Scene {
       this.maze.dotGroup,
       (_player, dot) => {
         const d = dot as Phaser.Physics.Arcade.Sprite
-        if (!this.player.spinning) {
-          d.disableBody(true, true)
-          this.player.collectDot()
-        }
+        d.disableBody(true, true)
+        this.player.collectDot()
 
         if (this.maze.dotGroup.countActive() === 0) {
           this.gameState = 'won'
@@ -89,6 +87,8 @@ export class Game extends Scene {
         return true
       },
     )
+    this.tweens.timeScale = TIMESCALE
+    this.anims.globalTimeScale = TIMESCALE
   }
 
   update(_time: number, delta: number) {
