@@ -46,7 +46,7 @@ export class Maze {
   private createGlowTextures(scene: Phaser.Scene) {
     for (const [key, radius, color] of [
       ['dot-glow', CELL * 0.6, 0xaa7711],
-      ['power-glow', CELL * 0.8, 0xff8800],
+      ['power-glow', CELL * 1, 0xff8800],
     ] as [string, number, number][]) {
       if (scene.textures.exists(key)) continue
       const size = Math.ceil(radius * 2)
@@ -54,7 +54,7 @@ export class Maze {
       const steps = 20
       for (let i = steps; i >= 1; i--) {
         const r = (i / steps) * radius
-        const a = (1 - i / steps) * 0.1
+        const a = (1 - i / steps) * 0.2
         g.fillStyle(color, a).fillCircle(size / 2, size / 2, r)
       }
       g.generateTexture(key, size, size).destroy()
@@ -72,7 +72,7 @@ export class Maze {
   }
 
   updateGlow(time: number) {
-    const speed = 0.0035
+    const speed = 0.003
     for (const { dot, img, phase } of this.glowSprites) {
       if (!dot.active) {
         if (img.visible) img.setVisible(false)
