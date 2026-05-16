@@ -95,8 +95,8 @@ export class Game extends Scene {
     if (this.gameState !== 'playing') return
 
     const t = _time * 0.00004
-    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 200)
-    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 200)
+    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 220)
+    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 220)
     this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.1)
     this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
 
