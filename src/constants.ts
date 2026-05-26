@@ -6,8 +6,9 @@ export const ANGLES = [0, 180, -90, 90]
 
 // player speed
 export const PLAYER_SPEED = 3
+export const MAX_PLAYER_SPEED = 6
 // how far through a tile (0–1) before a queued perpendicular turn snaps early
-export const SPIN_DURATION = 200
+export const SPIN_DURATION = 240
 export const FLIP_DURATION = 120
 export const DASH_COOLDOWN = 1000 // ms between dashes
 export const DASH_DISTANCE = 2 // tiles

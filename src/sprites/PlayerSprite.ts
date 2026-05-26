@@ -9,6 +9,7 @@ import {
   DX,
   DY,
   FLIP_DURATION,
+  MAX_PLAYER_SPEED,
   PLAYER_SPEED,
   SPIN_DURATION,
 } from '../constants'
@@ -43,6 +44,8 @@ export class PlayerSprite {
   private cornerY = 0
   private cornerLerp = 1
   private cornerDir = 0
+  private boostAmount = 0
+  private boostSustainTimer = 0
   private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key
   private dotParticles!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -61,7 +64,7 @@ export class PlayerSprite {
     const py = this.tileY * CELL + CELL
     this.x = px
     this.y = py
-    this.sprite = scene.physics.add.sprite(px, py, 'sprites', 0).setDepth(2)
+    this.sprite = scene.physics.add.sprite(px, py, 'player', 0).setDepth(2)
     this.audioCtx = new AudioContext()
     this.createEatEffects()
 
@@ -73,7 +76,6 @@ export class PlayerSprite {
         localStorage.setItem('muted', String(this.muted))
       })
     this.applyDir(this.dir)
-    this.sprite.play('player-move')
   }
 
   get grid() {
@@ -94,8 +96,15 @@ export class PlayerSprite {
     this.dotQueueTimer = Math.max(0, this.dotQueueTimer - delta)
     if (this.dotQueue > 0 && this.dotQueueTimer === 0) {
       this.dotQueue--
-      this.dotQueueTimer = DOT_EFFECT_INTERVAL
+      this.dotQueueTimer = DOT_EFFECT_INTERVAL / this.speedRatio ** 2
       this.processDotEat()
+    } else if (this.dotQueue === 0 && this.dotQueueTimer === 0) {
+      this.scene.tweens.add({
+        targets: this.tintOverlay,
+        alpha: 0,
+        duration: 300,
+        ease: 'Sine.easeOut',
+      })
     }
     if (this.wrap.tick(delta, this)) return false
 
@@ -131,6 +140,7 @@ export class PlayerSprite {
         this.dashing = true
         this.moving = true
         this.dashDistanceLeft = DASH_DISTANCE
+        this.addBoost()
       }
     }
     if (!this.moving) {
@@ -145,7 +155,8 @@ export class PlayerSprite {
     }
 
     if (this.moving && !wasMoving) {
-      if (!this.spinning) this.sprite.play('player-move')
+      if (!this.spinning)
+        this.sprite.play({ key: 'player-move', frameRate: 4 * this.speedRatio })
     } else if (!this.moving && wasMoving) {
       this.sprite.stop()
     }
@@ -155,18 +166,25 @@ export class PlayerSprite {
       if (this.spinTimer <= 0) {
         this.spinning = false
         this.applyDir(this.dir)
-        this.sprite.play('player-move')
+        this.sprite.play({ key: 'player-move', frameRate: 4 * this.speedRatio })
       }
     }
 
     if (this.cornerLerp < 1) {
       const CORNER_SPEED = 0.75
-      const val = this.cornerLerp + (PLAYER_SPEED * delta * CORNER_SPEED) / 1000
+      const val = this.cornerLerp + (this.speed * delta * CORNER_SPEED) / 1000
       this.cornerLerp = Math.min(1, val)
     }
 
+    if (this.boostSustainTimer > 0) {
+      this.boostSustainTimer = Math.max(0, this.boostSustainTimer - delta)
+    } else if (this.boostAmount > 0) {
+      const dec = (PLAYER_SPEED * 0.4 * delta) / 1000
+      this.boostAmount = Math.max(0, this.boostAmount - dec)
+    }
+
     if (this.moving) {
-      const moveStep = (PLAYER_SPEED * delta) / 1000
+      const moveStep = (this.speed * delta) / 1000
       if (this.dashing) {
         this.dashDistanceLeft -= moveStep * 2
         if (this.dashDistanceLeft <= 0) {
@@ -205,6 +223,7 @@ export class PlayerSprite {
         ) {
           this.moving = false
           this.progress = 0
+          this.sprite.stop()
         }
 
         this.updatePosition()
@@ -252,6 +271,7 @@ export class PlayerSprite {
     this.progress = 0
     this.turnTo(heldDir)
     this.nextDir = heldDir
+    this.addBoost()
 
     return true
   }
@@ -285,7 +305,7 @@ export class PlayerSprite {
     this.y = fracY * CELL + CELL + this.cornerY * arc
     this.sprite.setPosition(this.x, this.y)
     this.updateBodyCircle()
-    this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
+    // this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
     this.tintOverlay
       .setPosition(this.x, this.y)
       .setAngle(this.sprite.angle)
@@ -302,17 +322,35 @@ export class PlayerSprite {
     this.dir = dir
     this.spinning = true
     if (this.isFlip(oldDir, dir)) {
-      this.spinTimer = FLIP_DURATION
+      this.spinTimer = FLIP_DURATION / this.speedRatio
       this.applyDir(dir)
       this.sprite.play('player-flip')
+      this.boostAmount = 0
+      this.boostSustainTimer = 0
       return
     }
     this.sprite
       .setAngle(0)
       .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
-    this.spinTimer = SPIN_DURATION
-    if (this.dir === 0 || this.dir === 1) this.sprite.play('player-spin-2')
-    else this.sprite.play('player-spin')
+    this.spinTimer = SPIN_DURATION / this.speedRatio
+    const spinFrameRate = 15 * this.speedRatio
+    if (this.dir === 0 || this.dir === 1)
+      this.sprite.play({ key: 'player-spin-2', frameRate: spinFrameRate })
+    else this.sprite.play({ key: 'player-spin', frameRate: spinFrameRate })
+  }
+
+  private addBoost() {
+    this.boostAmount += PLAYER_SPEED * 0.4
+    this.boostAmount = Math.min(4, this.boostAmount)
+    this.boostSustainTimer = 500
+  }
+
+  private get speed(): number {
+    return Math.min(PLAYER_SPEED + this.boostAmount, MAX_PLAYER_SPEED)
+  }
+
+  private get speedRatio(): number {
+    return this.speed / PLAYER_SPEED
   }
 
   private get wrapping(): boolean {
@@ -362,11 +400,11 @@ export class PlayerSprite {
     this.dotParticles = this.scene.add
       .particles(0, 0, 'dots', {
         frame: 2,
-        scale: { start: 1, end: 0 },
+        scale: { start: 0.7, end: 0 },
         lifespan: { min: 300, max: 600 },
         emitting: false,
       })
-      .setDepth(2)
+      .setDepth(-1)
 
     this.scene.tweens.killTweensOf(this.glow).add({
       targets: this.glow,
@@ -381,20 +419,19 @@ export class PlayerSprite {
   private processDotEat() {
     this.playEatSound()
     this.fireEatParticles()
-    this.scene.tweens.killTweensOf(this.tintOverlay).add({
-      targets: this.tintOverlay,
-      alpha: { from: 0.5, to: 0 },
-      duration: DOT_EFFECT_INTERVAL,
-      ease: 'Sine.easeInOut',
-    })
+    this.scene.tweens.killTweensOf(this.tintOverlay)
+    this.tintOverlay.setAlpha(0.5)
   }
 
   private fireEatParticles() {
     const { x, y } = this.mouthPosition
-    const count = 1 + Math.floor(Math.random() * 2)
+    const count = Math.max(
+      1,
+      Math.round((2 + Math.random() * 3) / this.speedRatio),
+    )
     for (let i = 0; i < count; i++) {
       const angle = this.angle + Math.PI + (Math.random() - 0.5) * (Math.PI / 2)
-      const speed = 20 + Math.random() * 40
+      const speed = (20 + Math.random() * 40) * this.speedRatio
       const p = this.dotParticles.emitParticleAt(x, y, 1)
       if (p) {
         p.velocityX = Math.cos(angle) * speed
@@ -406,7 +443,11 @@ export class PlayerSprite {
   private playEatSound() {
     if (this.muted) return
     const jitter = 1 + (Math.random() - 0.5) * 0.08
-    const freq = (this.eatToggle === 0 ? 320 : 220) * jitter
+    const freq =
+      (this.eatToggle === 0 ? 320 : 220) *
+      jitter *
+      (this.speedRatio >= 2 ? 1.5 : this.speedRatio >= 1.5 ? 1.25 : 1)
+
     this.eatToggle = 1 - this.eatToggle
     eatSound(this.audioCtx, freq * 1.2, freq * 0.2, 0.1, 0.06)
   }
