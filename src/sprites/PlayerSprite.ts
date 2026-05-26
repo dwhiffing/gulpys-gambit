@@ -46,9 +46,11 @@ export class PlayerSprite {
   private cornerDir = 0
   private boostAmount = 0
   private boostSustainTimer = 0
+  private swimTrailTimer = 0
   private wrap = new WrapHelper()
   private zKey: Phaser.Input.Keyboard.Key
   private dotParticles!: Phaser.GameObjects.Particles.ParticleEmitter
+  private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
   private audioCtx!: AudioContext
   private muted = localStorage.getItem('muted') === 'true'
   private eatToggle = 0
@@ -94,6 +96,7 @@ export class PlayerSprite {
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
     this.dashCooldown = Math.max(0, this.dashCooldown - delta)
     this.dotQueueTimer = Math.max(0, this.dotQueueTimer - delta)
+    this.swimTrailTimer = Math.max(0, this.swimTrailTimer - delta)
     if (this.dotQueue > 0 && this.dotQueueTimer === 0) {
       this.dotQueue--
       this.dotQueueTimer = DOT_EFFECT_INTERVAL / this.speedRatio ** 2
@@ -316,6 +319,17 @@ export class PlayerSprite {
     this.y = fracY * CELL + CELL + this.cornerY * arc
     this.sprite.setPosition(this.x, this.y)
     this.updateBodyCircle()
+
+    if (this.moving && this.swimTrailTimer === 0) {
+      const { dx, dy } = this.mouthDir
+      const tailX = this.x - dx * CELL * 0.7
+      const tailY = this.y - dy * CELL * 0.7
+      const count = this.speedRatio >= 2 ? 2 : 1
+      const interval =
+        this.speedRatio >= 2 ? 50 : this.speedRatio >= 1.5 ? 100 : 500
+      this.swimTrail.emitParticleAt(tailX, tailY, count)
+      this.swimTrailTimer = interval
+    }
     // this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
     this.tintOverlay
       .setPosition(this.x, this.y)
@@ -417,6 +431,17 @@ export class PlayerSprite {
         emitting: false,
       })
       .setDepth(-1)
+
+    this.swimTrail = this.scene.add
+      .particles(0, 0, 'dots', {
+        frame: 1,
+        scale: { start: 0.5, end: 1.5 },
+        alpha: { start: 0.6, end: 0 },
+        lifespan: { min: 300, max: 2500 },
+        speed: { min: 2, max: 9 },
+        emitting: false,
+      })
+      .setDepth(1)
   }
 
   private processDotEat() {
