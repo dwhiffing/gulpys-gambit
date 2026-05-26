@@ -48,6 +48,7 @@ export class PlayerSprite {
   private cornerY = 0
   private cornerLerp = 1
   private cornerDir = 0
+  private waitingForInput = true
   private boostAmount = 0
   private boostSustainTimer = 0
   private swimTrailTimer = 0
@@ -119,6 +120,16 @@ export class PlayerSprite {
     else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
     else if (cursors.up.isDown) this.nextDir = DIRS.UP
     else if (cursors.down.isDown) this.nextDir = DIRS.DOWN
+
+    if (this.waitingForInput) {
+      const anyDown =
+        cursors.right.isDown ||
+        cursors.left.isDown ||
+        cursors.up.isDown ||
+        cursors.down.isDown
+      if (!anyDown) return
+      this.waitingForInput = false
+    }
 
     if (this.moving && !this.wrapping && this.isFlip(this.dir, this.nextDir)) {
       const prevDir = this.dir

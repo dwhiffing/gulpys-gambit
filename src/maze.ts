@@ -582,43 +582,61 @@ function generateMaze(config: MazeConfig): GenerateResult {
           position: seed, // fallback: no wraps available
         }))
 
-  // ── Random player spawn (must have a valid 2×2 open block) ───────────────
-  const isOpen = (t: number) => t === TILES.DOT || t === TILES.EMPTY
-  const spawnCandidates: TilePos[] = []
+  // ── Player spawn: logical dead-end cell closest to center ────────────────
+  // Stride-3 layout: cell (lc,lr) is the 2×2 block at [lc*3+1..+2, lr*3+1..+2].
+  // The connector between (lc,lr) and a neighbor (lc+dlc, lr+dlr) is the 2-tile
+  // passage at: x = lc*3 + (dlc>0 ? 3 : dlc<0 ? 0 : 1), y = lr*3 + (dlr>0 ? 3 : dlr<0 ? 0 : 1)
+  // A dead-end cell has exactly one open connector.
+  const S = 3
+  const isPassable = (tx: number, ty: number) =>
+    grid[ty]?.[tx] === TILES.DOT || grid[ty]?.[tx] === TILES.POWER
+
   const ghostPositions = new Set(
     spawners.map((s) => `${s.position.x},${s.position.y}`),
   )
-  for (let ty = 1; ty < rows - 2; ty++) {
-    for (let tx = 1; tx < cols - 2; tx++) {
-      if (
-        !isOpen(grid[ty][tx]) ||
-        !isOpen(grid[ty][tx + 1]) ||
-        !isOpen(grid[ty + 1][tx]) ||
-        !isOpen(grid[ty + 1][tx + 1])
+  const cx = cols / 2
+  const cy = rows / 2
+
+  const CELL_DIRS = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const
+
+  const countConnectors = (lc: number, lr: number) =>
+    CELL_DIRS.filter(([dlc, dlr]) => {
+      const nlc = lc + dlc,
+        nlr = lr + dlr
+      if (nlc < 0 || nlc >= fullLcols || nlr < 0 || nlr >= fullLrows)
+        return false
+      const tx = lc * S + (dlc > 0 ? S : dlc < 0 ? 0 : 1)
+      const ty = lr * S + (dlr > 0 ? S : dlr < 0 ? 0 : 1)
+      return (
+        isPassable(tx, ty) ||
+        isPassable(tx + (dlc === 0 ? 1 : 0), ty + (dlr === 0 ? 1 : 0))
       )
-        continue
-      if (ghostPositions.has(`${tx},${ty}`)) continue
-      spawnCandidates.push({ x: tx, y: ty })
+    }).length
+
+  const deadEnds: TilePos[] = []
+  for (let lr = 0; lr < fullLrows; lr++) {
+    for (let lc = 0; lc < fullLcols; lc++) {
+      const cellTx = lc * S + 1
+      const cellTy = lr * S + 1
+      if (!isPassable(cellTx, cellTy)) continue
+      if (ghostPositions.has(`${cellTx},${cellTy}`)) continue
+      if (countConnectors(lc, lr) === 1) deadEnds.push({ x: cellTx, y: cellTy })
     }
   }
 
-  if (spawnCandidates.length === 0) {
-    outer2: for (let ty = 1; ty < rows - 2; ty++)
-      for (let tx = 1; tx < cols - 2; tx++)
-        if (
-          isOpen(grid[ty][tx]) &&
-          isOpen(grid[ty][tx + 1]) &&
-          isOpen(grid[ty + 1][tx]) &&
-          isOpen(grid[ty + 1][tx + 1])
-        ) {
-          spawnCandidates.push({ x: tx, y: ty })
-          break outer2
-        }
-  }
-
-  const playerSpawn =
-    spawnCandidates[Math.floor(Math.random() * spawnCandidates.length)]
-  grid[playerSpawn.y][playerSpawn.x] = TILES.EMPTY
+  deadEnds.sort(
+    (a, b) =>
+      (a.x - cx) ** 2 + (a.y - cy) ** 2 - ((b.x - cx) ** 2 + (b.y - cy) ** 2),
+  )
+  const playerSpawn = deadEnds[0]
+  for (let dy = 0; dy < 2; dy++)
+    for (let dx = 0; dx < 2; dx++)
+      grid[playerSpawn.y + dy][playerSpawn.x + dx] = TILES.EMPTY
 
   return { grid, cols, rows, spawners, playerSpawn }
 }
