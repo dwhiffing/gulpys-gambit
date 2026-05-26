@@ -183,6 +183,8 @@ export class PlayerSprite {
       this.boostAmount = Math.max(0, this.boostAmount - dec)
     }
 
+    this.updateGlow()
+
     if (this.moving) {
       const moveStep = (this.speed * delta) / 1000
       if (this.dashing) {
@@ -294,6 +296,15 @@ export class PlayerSprite {
     )
   }
 
+  private updateGlow() {
+    console.log(this.speedRatio)
+    if (this.speedRatio >= 1.5) {
+      this.glow.outerStrength = this.speedRatio >= 2 ? 1.75 : 1.25
+    } else {
+      this.glow.outerStrength = 0.5
+    }
+  }
+
   private updatePosition() {
     const { x: fracX, y: fracY } = this.moving
       ? moveFrac(this, this.progress, this.wrap.active)
@@ -390,6 +401,7 @@ export class PlayerSprite {
     this.glow = this.sprite
       .enableFilters()
       .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)
+    this.glow.outerStrength = 0.5
     this.tintOverlay = this.scene.add
       .sprite(this.x, this.y, 'player', 0)
       .setDepth(3)
@@ -405,15 +417,6 @@ export class PlayerSprite {
         emitting: false,
       })
       .setDepth(-1)
-
-    this.scene.tweens.killTweensOf(this.glow).add({
-      targets: this.glow,
-      outerStrength: { from: 0.5, to: 1.5 },
-      duration: 800,
-      yoyo: true,
-      ease: 'sine.inOut',
-      repeat: -1,
-    })
   }
 
   private processDotEat() {
