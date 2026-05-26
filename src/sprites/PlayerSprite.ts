@@ -23,6 +23,10 @@ import {
   wrapY,
 } from '../utils'
 
+const BOOST_SUSTAIN = 1250
+const BOOST_INC = 0.1
+const BOOST_DEC = 0.3
+
 export class PlayerSprite {
   tileX: number
   tileY: number
@@ -182,8 +186,9 @@ export class PlayerSprite {
     if (this.boostSustainTimer > 0) {
       this.boostSustainTimer = Math.max(0, this.boostSustainTimer - delta)
     } else if (this.boostAmount > 0) {
-      const dec = (PLAYER_SPEED * 0.4 * delta) / 1000
+      const dec = PLAYER_SPEED * BOOST_DEC
       this.boostAmount = Math.max(0, this.boostAmount - dec)
+      this.boostSustainTimer = BOOST_SUSTAIN
     }
 
     this.updateGlow()
@@ -300,11 +305,15 @@ export class PlayerSprite {
   }
 
   private updateGlow() {
-    console.log(this.speedRatio)
-    if (this.speedRatio >= 1.5) {
-      this.glow.outerStrength = this.speedRatio >= 2 ? 1.75 : 1.25
-    } else {
-      this.glow.outerStrength = 0.5
+    const target = this.speedRatio >= 1.9 ? 1.5 : 0.5
+    if (Math.abs(this.glow.outerStrength - target) > 0.01) {
+      this.scene.tweens.killTweensOf(this.glow)
+      this.scene.tweens.add({
+        targets: this.glow,
+        outerStrength: target,
+        duration: 300,
+        ease: 'Sine.easeInOut',
+      })
     }
   }
 
@@ -365,9 +374,9 @@ export class PlayerSprite {
   }
 
   private addBoost() {
-    this.boostAmount += PLAYER_SPEED * 0.4
+    this.boostAmount += PLAYER_SPEED * BOOST_INC
     this.boostAmount = Math.min(4, this.boostAmount)
-    this.boostSustainTimer = 500
+    this.boostSustainTimer = BOOST_SUSTAIN
   }
 
   private get speed(): number {
