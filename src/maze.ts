@@ -7,8 +7,21 @@ export interface TilePos {
   y: number
 }
 
+export type EnemyType =
+  | 'naut'
+  | 'teeth1'
+  | 'angler1'
+  | 'oct'
+  | 'blob'
+  | 'roach'
+  | 'teeth2'
+  | 'teeth3'
+  | 'angler2'
+  | 'turtle'
+
 export interface Spawner {
   position: TilePos
+  enemyType: EnemyType
 }
 
 export class Maze {
@@ -573,14 +586,14 @@ function generateMaze(config: MazeConfig): GenerateResult {
   }
 
   // ── Assign ghost spawners from wrap tiles ────────────────────────────────
-  const spawners: Spawner[] =
+  const ghostEntries: EnemyType[] = Object.entries(config.ghosts).flatMap(
+    ([type, count]) => Array(count).fill(type as EnemyType),
+  )
+  const spawners: Spawner[] = ghostEntries.map((enemyType, i) =>
     wrapSpawns.length > 0
-      ? Array.from({ length: config.ghostCount }, (_, i) => ({
-          position: wrapSpawns[i % wrapSpawns.length],
-        }))
-      : Array.from({ length: config.ghostCount }, () => ({
-          position: seed, // fallback: no wraps available
-        }))
+      ? { position: wrapSpawns[i % wrapSpawns.length], enemyType }
+      : { position: seed, enemyType },
+  )
 
   // ── Player spawn: logical dead-end cell closest to center ────────────────
   // Stride-3 layout: cell (lc,lr) is the 2×2 block at [lc*3+1..+2, lr*3+1..+2].

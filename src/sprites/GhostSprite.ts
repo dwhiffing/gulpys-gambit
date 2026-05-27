@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser'
 import * as C from '../constants'
-import type { Spawner, TilePos } from '../maze'
+import { ENEMY_TYPES } from '../enemyTypes'
+import type { EnemyType, Spawner, TilePos } from '../maze'
 import type { Game } from '../scenes/Game'
 import {
   WrapHelper,
@@ -29,6 +30,7 @@ export class GhostSprite {
   private wrap = new WrapHelper()
 
   colorIndex: number
+  enemyType: EnemyType
   private aiType: 1 | 2 | 3 | 4
   cols!: number
   rows!: number
@@ -45,14 +47,18 @@ export class GhostSprite {
     this.tileY = spawner.position.y
     this.exitDelay = 1000 + colorIndex * 500
     this.colorIndex = colorIndex
-    this.aiType = ((colorIndex % 4) + 1) as 1 | 2 | 3 | 4
+    this.enemyType = spawner.enemyType
+    this.aiType = ENEMY_TYPES[spawner.enemyType].aiType
     this.dir = C.DIRS.RIGHT
 
     this.sprite = scene.physics.add
       .sprite(0, 0, 'sprites')
       .setDepth(2)
       .setVisible(false)
-      .play(`fish-${colorIndex + 1}`)
+      .play({
+        key: `fish-${this.enemyType}`,
+        frameRate: ENEMY_TYPES[spawner.enemyType].frameRate,
+      })
     this.sprite.body!.setCircle(C.CELL * 0.6, C.CELL * 0.4, C.CELL * 0.4)
 
     if (DEBUG_GHOST_TARGETS) {
@@ -117,7 +123,8 @@ export class GhostSprite {
     playerDir: number,
     blinkyPos: TilePos,
   ) {
-    this.progress += (C.GHOST_SPEED * delta) / 1000
+    const { speed } = ENEMY_TYPES[this.enemyType]
+    this.progress += (speed * delta) / 1000
 
     if (this.wrapping && !this.wrap.active && this.progress >= 2) {
       this.progress = 2

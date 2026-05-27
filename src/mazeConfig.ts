@@ -2,6 +2,8 @@
  * Maze generation configuration — edit MAZE_CONFIG to tune generation.
  */
 
+import { EnemyType } from './maze'
+
 /** How the generated half-maze is reflected to fill the full grid. */
 export type MazeSymmetry =
   | 'none' // fully random, no mirroring
@@ -29,8 +31,8 @@ export interface MazeConfig {
    */
   loopFactor: number
   wraps: WrapConfig
-  /** Number of ghosts to spawn. Each is assigned a wrap tile as its spawn/respawn point. */
-  ghostCount: number
+  /** Map of enemy type name to spawn count. */
+  ghosts: Partial<Record<EnemyType, number>>
   /** Number of power pellets to place. Spread evenly around the maze perimeter. */
   powerCount: number
 }
@@ -42,8 +44,19 @@ export const MAZE_CONFIG: MazeConfig = {
   symmetry: 'none',
   loopFactor: 0.2,
   wraps: { x: 2, y: 1 },
-  ghostCount: 1,
-  powerCount: 4,
+  ghosts: {
+    teeth1: 0,
+    naut: 1,
+    angler1: 0,
+    oct: 0,
+    blob: 0,
+    roach: 0,
+    teeth2: 0,
+    teeth3: 0,
+    angler2: 0,
+    turtle: 0,
+  },
+  powerCount: 0,
 }
 
 export const GHOST_COLORS: [number, number, number][] = [
