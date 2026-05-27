@@ -104,7 +104,9 @@ export class PlayerSprite {
     this.swimTrailTimer = Math.max(0, this.swimTrailTimer - delta)
     if (this.dotQueue > 0 && this.dotQueueTimer === 0) {
       this.dotQueue--
-      this.dotQueueTimer = DOT_EFFECT_INTERVAL / this.speedRatio ** 2
+      this.dotQueueTimer = this.dashing
+        ? 0
+        : DOT_EFFECT_INTERVAL / this.speedRatio ** 2
       this.processDotEat()
     } else if (this.dotQueue === 0 && this.dotQueueTimer === 0) {
       this.scene.tweens.add({
