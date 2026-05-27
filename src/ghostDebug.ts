@@ -26,7 +26,7 @@ export function drawGhostDebugLine(
   const perpOffset = colorIndex * 2 - 3
 
   debugLine.clear()
-  debugLine.lineStyle(2, color, 0.8)
+  debugLine.lineStyle(1, color, 0.8)
   debugLine.strokeRect(
     target.x * C.CELL + 1,
     target.y * C.CELL + 1,
@@ -34,7 +34,7 @@ export function drawGhostDebugLine(
     C.CELL * 2 - 2,
   )
   if (path.length < 2) return
-  debugLine.lineStyle(3, color, 0.8)
+  debugLine.lineStyle(1, color, 0.8)
 
   // Helper: tile → pixel center with perpendicular offset based on segment direction
   const toPx = (tile: TilePos, segDx: number, segDy: number) => {
@@ -60,10 +60,8 @@ export function drawGhostDebugLine(
 
     // When wrapping, the tile delta sign is inverted relative to actual movement direction
     // (e.g. moving left from x=0 lands at x=cols-1, giving dx=cols-1 which looks rightward)
-    const actualNdx =
-      dx === 0 ? 0 : wraps ? (dx > 0 ? -1 : 1) : dx > 0 ? 1 : -1
-    const actualNdy =
-      dy === 0 ? 0 : wraps ? (dy > 0 ? -1 : 1) : dy > 0 ? 1 : -1
+    const actualNdx = dx === 0 ? 0 : wraps ? (dx > 0 ? -1 : 1) : dx > 0 ? 1 : -1
+    const actualNdy = dy === 0 ? 0 : wraps ? (dy > 0 ? -1 : 1) : dy > 0 ? 1 : -1
     const [nextX, nextY] = toPx(path[i], actualNdx, actualNdy)
 
     if (wraps) {
@@ -79,10 +77,8 @@ export function drawGhostDebugLine(
           ? (actualNdy < 0 ? 0 : rows * C.CELL) + oy
           : path[i - 1].y * C.CELL + C.CELL + oy
       // Entry pixel: opposite boundary
-      const entryX =
-        dx !== 0 ? (actualNdx < 0 ? cols * C.CELL : 0) + ox : exitX
-      const entryY =
-        dy !== 0 ? (actualNdy < 0 ? rows * C.CELL : 0) + oy : exitY
+      const entryX = dx !== 0 ? (actualNdx < 0 ? cols * C.CELL : 0) + ox : exitX
+      const entryY = dy !== 0 ? (actualNdy < 0 ? rows * C.CELL : 0) + oy : exitY
 
       debugLine.beginPath()
       debugLine.moveTo(curX, curY)
