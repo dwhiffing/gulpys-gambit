@@ -28,6 +28,7 @@ export class GhostSprite {
   private moveTween: Phaser.Tweens.Tween | null = null
   private wrapTimer = 0
   private nextStop: Stop | null = null
+  private atIntersection = false
 
   colorIndex: number
   enemyType: EnemyType
@@ -139,6 +140,7 @@ export class GhostSprite {
       this.sprite.setVisible(false)
       this.wrapTimer = C.WRAP_DELAY
     } else {
+      this.atIntersection = true
       this.startNextTween()
     }
   }
@@ -188,15 +190,68 @@ export class GhostSprite {
 
   private startNextTween() {
     const player = this.scene.player
-    const newDir = this.chooseDir(player.tileX, player.tileY, player.dir)
+    const oldDir = this.dir
+    const newDir = this.chooseDir(
+      this.tileX,
+      this.tileY,
+      this.dir,
+      player.tileX,
+      player.tileY,
+      player.dir,
+    )
     if (newDir !== -1) this.dir = newDir
     this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+
+    const { easeIn, easeOut, roundedCorners } = ENEMY_TYPES[this.enemyType]
+
+    // When the ghost just arrived at an intersection (post-spawn/wrap/dead-end) and needs
+    // to turn, do an arc from the current position using a diagonal control point.
+    if (
+      roundedCorners &&
+      this.atIntersection &&
+      newDir !== -1 &&
+      newDir !== oldDir
+    ) {
+      this.atIntersection = false
+      const cx = this.sprite.x
+      const cy = this.sprite.y
+      const p0 = { x: cx, y: cy }
+      const p1 = {
+        x: cx + (C.DX[oldDir] + C.DX[newDir]) * C.CELL * 0.5,
+        y: cy + (C.DY[oldDir] + C.DY[newDir]) * C.CELL * 0.5,
+      }
+      const p2 = {
+        x: cx + C.DX[newDir] * C.CELL,
+        y: cy + C.DY[newDir] * C.CELL,
+      }
+      this.addBezierTween(p0, p1, p2, 2, () => {
+        this.moveTween = null
+        this.tileX += C.DX[newDir]
+        this.tileY += C.DY[newDir]
+        this.startNextTween()
+      })
+      return
+    }
+    this.atIntersection = false
 
     const stop = this.findNextStop()
     if (!stop) return
     this.nextStop = stop
 
-    const { easeIn, easeOut } = ENEMY_TYPES[this.enemyType]
+    if (roundedCorners && !stop.isWrap) {
+      const futureDir = this.chooseDir(
+        stop.landTileX,
+        stop.landTileY,
+        this.dir,
+        player.tileX,
+        player.tileY,
+        player.dir,
+      )
+      if (futureDir !== -1 && futureDir !== this.dir) {
+        this.startRoundedCornerTween(stop, futureDir)
+        return
+      }
+    }
     // Ease phases use 2× duration: for Quad.easeIn/Out, velocity at the handoff
     // point equals 2×(distance/duration), so doubling duration makes it match full speed.
     const inSteps = !easeIn ? 0 : Math.min(2, stop.steps)
@@ -350,6 +405,9 @@ export class GhostSprite {
   }
 
   private chooseDir(
+    fromTileX: number,
+    fromTileY: number,
+    fromDir: number,
     playerTileX: number,
     playerTileY: number,
     playerDir: number,
@@ -362,10 +420,10 @@ export class GhostSprite {
     const queue: Node[] = []
 
     for (let dir = 0; dir < 4; dir++) {
-      if (dir === OPPOSITE[this.dir]) continue
-      if (!canMove(this.grid, this.tileX, this.tileY, dir, false)) continue
-      const nx = wrapX(this.tileX + C.DX[dir], this.cols)
-      const ny = wrapY(this.tileY + C.DY[dir], this.rows)
+      if (dir === OPPOSITE[fromDir]) continue
+      if (!canMove(this.grid, fromTileX, fromTileY, dir, false)) continue
+      const nx = wrapX(fromTileX + C.DX[dir], this.cols)
+      const ny = wrapY(fromTileY + C.DY[dir], this.rows)
       const key = `${nx},${ny}`
       if (!visited.has(key)) {
         visited.add(key)
@@ -391,12 +449,63 @@ export class GhostSprite {
 
     // Target unreachable — any valid non-reverse move
     for (let dir = 0; dir < 4; dir++) {
-      if (dir === OPPOSITE[this.dir]) continue
-      if (canMove(this.grid, this.tileX, this.tileY, dir, false)) return dir
+      if (dir === OPPOSITE[fromDir]) continue
+      if (canMove(this.grid, fromTileX, fromTileY, dir, false)) return dir
     }
-    if (canMove(this.grid, this.tileX, this.tileY, OPPOSITE[this.dir], false))
-      return OPPOSITE[this.dir]
+    if (canMove(this.grid, fromTileX, fromTileY, OPPOSITE[fromDir], false))
+      return OPPOSITE[fromDir]
     return -1
+  }
+
+  private startRoundedCornerTween(stop: Stop, futureDir: number) {
+    const cx = stop.toX
+    const cy = stop.toY
+
+    const p0 = {
+      x: cx - C.DX[this.dir] * C.CELL,
+      y: cy - C.DY[this.dir] * C.CELL,
+    }
+    const p1 = { x: cx, y: cy }
+    const p2 = {
+      x: cx + C.DX[futureDir] * C.CELL,
+      y: cy + C.DY[futureDir] * C.CELL,
+    }
+
+    this.addTween(p0.x, p0.y, stop.steps - 1, 'Linear', () => {
+      this.moveTween = null
+      this.addBezierTween(p0, p1, p2, 2, () => {
+        this.moveTween = null
+        this.tileX = stop.landTileX + C.DX[futureDir]
+        this.tileY = stop.landTileY + C.DY[futureDir]
+        this.dir = futureDir
+        this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+        this.startNextTween()
+      })
+    })
+  }
+
+  private addBezierTween(
+    p0: { x: number; y: number },
+    p1: { x: number; y: number },
+    p2: { x: number; y: number },
+    steps: number,
+    onComplete: () => void,
+  ) {
+    const { speed } = ENEMY_TYPES[this.enemyType]
+    const counter = { t: 0 }
+    this.moveTween = this.scene.tweens.add({
+      targets: counter,
+      t: 1,
+      duration: (steps * 1000) / speed,
+      ease: 'Linear',
+      onUpdate: () => {
+        const t = counter.t
+        const mt = 1 - t
+        this.sprite.x = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x
+        this.sprite.y = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y
+      },
+      onComplete,
+    })
   }
 
   private tracePath(

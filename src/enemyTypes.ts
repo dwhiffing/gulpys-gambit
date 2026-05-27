@@ -8,23 +8,25 @@ export interface EnemyConfig {
   swimTrailInterval?: number
   easeIn?: boolean
   easeOut?: boolean
+  roundedCorners?: boolean
 }
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
-  teeth1: { speed: GHOST_SPEED, aiType: 1 },
   teeth2: { speed: GHOST_SPEED, aiType: 1 },
-  teeth3: { speed: GHOST_SPEED, aiType: 1 },
   naut: { speed: GHOST_SPEED, aiType: 1 },
   angler1: { speed: GHOST_SPEED, aiType: 1 },
-  angler2: { speed: GHOST_SPEED, aiType: 1 },
-  blob: { speed: GHOST_SPEED, aiType: 1 },
   roach: { speed: GHOST_SPEED, aiType: 1 },
-  turtle: { speed: GHOST_SPEED, aiType: 1 },
   oct: {
     speed: GHOST_SPEED * 2.5,
     aiType: 1,
     frameRate: 2,
-    easeOut: true,
+    // easeOut: true,
     swimTrailInterval: 150,
+    roundedCorners: true,
   },
+  // teeth1: { speed: GHOST_SPEED, aiType: 1 },
+  // teeth3: { speed: GHOST_SPEED, aiType: 1 },
+  // angler2: { speed: GHOST_SPEED, aiType: 1 },
+  // blob: { speed: GHOST_SPEED, aiType: 1 },
+  // turtle: { speed: GHOST_SPEED, aiType: 1 },
 }

@@ -47,12 +47,9 @@ export const MAZE_CONFIG: MazeConfig = {
   ghosts: {
     oct: 1,
     teeth2: 0,
-    turtle: 0,
     naut: 0,
     angler1: 0,
-    blob: 0,
     roach: 0,
-    angler2: 0,
   },
   powerCount: 0,
 }

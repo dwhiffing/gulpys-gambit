@@ -111,6 +111,7 @@ export class Game extends Scene {
   private killPlayer() {
     this.gameState = 'dying'
     this.player.die()
+    for (const g of this.ghosts) g.stop()
     this.time.delayedCall(1000, () => this.scene.restart())
   }
 }

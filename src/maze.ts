@@ -9,15 +9,15 @@ export interface TilePos {
 
 export type EnemyType =
   | 'naut'
-  | 'teeth1'
+  // | 'teeth1'
   | 'angler1'
   | 'oct'
-  | 'blob'
+  // | 'blob'
   | 'roach'
   | 'teeth2'
-  | 'teeth3'
-  | 'angler2'
-  | 'turtle'
+// | 'teeth3'
+// | 'angler2'
+// | 'turtle'
 
 export interface Spawner {
   position: TilePos
