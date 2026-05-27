@@ -2,6 +2,7 @@ import { AUTO, Game } from 'phaser'
 import { CELL } from './constants'
 import { MAZE_CONFIG } from './mazeConfig'
 import { Boot as BootScene } from './scenes/Boot'
+import { Fade as FadeScene } from './scenes/Fade'
 import { Game as GameScene } from './scenes/Game'
 import { Menu as MenuScene } from './scenes/Menu'
 import { calcZoom } from './utils'
@@ -22,7 +23,7 @@ const game = new Game({
     default: 'arcade',
     arcade: { debug: false, gravity: { x: 0, y: 0 } },
   },
-  scene: [BootScene, MenuScene, GameScene],
+  scene: [BootScene, MenuScene, GameScene, FadeScene],
 })
 
 window.addEventListener('resize', () => {

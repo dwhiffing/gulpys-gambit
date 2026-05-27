@@ -44,7 +44,10 @@ export class Boot extends Scene {
 
   create() {
     this.createAnimations()
-    this.scene.start('Game')
+    this.scene.launch('Checkerboard', {
+      nextScene: 'Menu',
+      stopScene: 'Boot',
+    })
   }
 
   private createAnimations() {

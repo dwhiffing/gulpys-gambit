@@ -37,19 +37,9 @@ export class Game extends Scene {
 
     const mazeW = this.maze.cols * CELL
     const mazeH = this.maze.rows * CELL
-    this.scale.resize(mazeW, mazeH)
     this.scale.setZoom(calcZoom(mazeW, mazeH))
 
-    this.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
-    this.bg = this.add
-      .tileSprite(0, 0, mazeW, mazeH, 'background')
-      .setOrigin(0)
-      .setAlpha(0.2)
-      .setDepth(-1)
-
-    this.bgDisplacement = this.bg
-      .enableFilters()
-      .filters!.internal.addDisplacement('distort')
+    this.createBackground(mazeW, mazeH)
 
     this.player = new PlayerSprite(this)
 
@@ -75,7 +65,9 @@ export class Game extends Scene {
           this.maze.hideAllGlows()
           this.gameState = 'won'
           for (const g of this.ghosts) g.stop()
-          this.time.delayedCall(2000, () => this.scene.restart())
+          this.time.delayedCall(1000, () =>
+            this.scene.launch('Checkerboard', { restartScene: 'Game' }),
+          )
         }
       },
     )
@@ -107,6 +99,41 @@ export class Game extends Scene {
     )
     this.tweens.timeScale = TIMESCALE
     this.anims.globalTimeScale = TIMESCALE
+  }
+
+  private createBackground(mazeW: number, mazeH: number) {
+    const { width, height } = this.scale.gameSize
+    const offsetX = Math.floor((width - mazeW) / 2)
+    const offsetY = Math.floor((height - mazeH) / 2)
+    this.cameras.main.scrollX = -offsetX
+    this.cameras.main.scrollY = -offsetY
+
+    const borderDepth = 100
+    const addBorder = (x: number, y: number, w: number, h: number) =>
+      this.add
+        .rectangle(x, y, w, h, 0x110525)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(borderDepth)
+    if (offsetX > 0) {
+      addBorder(0, 0, offsetX, height)
+      addBorder(offsetX + mazeW, 0, offsetX + 1, height)
+    }
+    if (offsetY > 0) {
+      addBorder(0, 0, width, offsetY)
+      addBorder(0, offsetY + mazeH, width, offsetY + 1)
+    }
+
+    this.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
+    this.bg = this.add
+      .tileSprite(0, 0, mazeW, mazeH, 'background')
+      .setOrigin(0)
+      .setAlpha(0.2)
+      .setDepth(-1)
+
+    this.bgDisplacement = this.bg
+      .enableFilters()
+      .filters!.internal.addDisplacement('distort')
   }
 
   update(_time: number, delta: number) {
@@ -169,6 +196,11 @@ export class Game extends Scene {
     this.gameState = 'dying'
     this.player.die()
     for (const g of this.ghosts) g.stop()
-    this.time.delayedCall(1000, () => this.scene.restart())
+    this.time.delayedCall(1000, () =>
+      this.scene.launch('Checkerboard', {
+        stopScene: 'Game',
+        nextScene: 'Menu',
+      }),
+    )
   }
 }
