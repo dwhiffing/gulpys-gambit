@@ -3,31 +3,31 @@ import * as C from '../constants'
 import { ENEMY_TYPES } from '../enemyTypes'
 import type { EnemyType, Spawner, TilePos } from '../maze'
 import type { Game } from '../scenes/Game'
-import {
-  WrapHelper,
-  canMove,
-  isWrapping,
-  moveFrac,
-  wrapX,
-  wrapY,
-} from '../utils'
 import { drawGhostDebugLine } from '../ghostDebug'
+import { canMove, isWrapping, wrapX, wrapY } from '../utils'
 
 const OPPOSITE = [C.DIRS.LEFT, C.DIRS.RIGHT, C.DIRS.DOWN, C.DIRS.UP]
 
-export const DEBUG_GHOST_TARGETS = false
+type Stop = {
+  toX: number
+  toY: number
+  landTileX: number
+  landTileY: number
+  steps: number
+  isWrap: boolean
+}
+
+export const DEBUG_GHOST_TARGETS = true
 
 export class GhostSprite {
   tileX: number
   tileY: number
-  progress = 0
   dir: number
-  x: number
-  y: number
   sprite: Phaser.Physics.Arcade.Sprite
   exitDelay: number
-  private spawning = false
-  private wrap = new WrapHelper()
+  private moveTween: Phaser.Tweens.Tween | null = null
+  private wrapTimer = 0
+  private nextStop: Stop | null = null
 
   colorIndex: number
   enemyType: EnemyType
@@ -51,7 +51,12 @@ export class GhostSprite {
     this.colorIndex = colorIndex
     this.enemyType = spawner.enemyType
     this.aiType = ENEMY_TYPES[spawner.enemyType].aiType
-    this.dir = C.DIRS.RIGHT
+    const tx = spawner.position.x
+    const ty = spawner.position.y
+    if (ty === 0) this.dir = C.DIRS.DOWN
+    else if (ty >= this.rows - 2) this.dir = C.DIRS.UP
+    else if (tx === 0) this.dir = C.DIRS.RIGHT
+    else this.dir = C.DIRS.LEFT
 
     this.sprite = scene.physics.add
       .sprite(0, 0, 'sprites')
@@ -76,139 +81,247 @@ export class GhostSprite {
     return this.scene.maze.grid
   }
 
-  get wrapping(): boolean {
-    return isWrapping(this.tileX, this.tileY, this.dir, this.cols, this.rows)
-  }
-
-  update(delta: number, blinkyPos: TilePos) {
-    const playerTileX = this.scene.player.tileX
-    const playerTileY = this.scene.player.tileY
-    const playerDir = this.scene.player.dir
-
-    if (this.spawning) return
-    if (this.tickExitDelay(delta)) return
-    if (this.wrap.tick(delta, this)) return
-
-    this.tickMovement(delta, playerTileX, playerTileY, playerDir, blinkyPos)
-    this.drawDebugLine(playerTileX, playerTileY, playerDir, blinkyPos)
-  }
-
-  private tickExitDelay(delta: number): boolean {
-    if (this.exitDelay <= 0) return false
-
-    this.exitDelay -= delta
-    if (this.exitDelay <= 0) {
-      // Compute the off-screen start position: one tile beyond the border in entry direction
-      const targetX = this.tileX * C.CELL + C.CELL
-      const targetY = this.tileY * C.CELL + C.CELL
-      const fromX = targetX - C.DX[this.dir] * C.CELL * 2
-      const fromY = targetY - C.DY[this.dir] * C.CELL * 2
-
-      this.sprite.setPosition(fromX, fromY)
-      this.sprite.setVisible(true)
-      this.spawning = true
-
-      this.scene.tweens.add({
-        targets: this.sprite,
-        x: targetX,
-        y: targetY,
-        duration: 400,
-        ease: 'Linear',
-        onComplete: () => {
-          this.spawning = false
-        },
-      })
-    }
-    return true
-  }
-
-  private tickMovement(
-    delta: number,
-    playerTileX: number,
-    playerTileY: number,
-    playerDir: number,
-    blinkyPos: TilePos,
-  ) {
-    const { speed } = ENEMY_TYPES[this.enemyType]
-    this.progress += (speed * delta) / 1000
-
-    if (this.wrapping && !this.wrap.active && this.progress >= 2) {
-      this.progress = 2
-      this.wrap.trigger()
-      this.sprite.setVisible(false)
+  update(delta: number) {
+    if (this.exitDelay > 0) {
+      this.exitDelay -= delta
+      if (this.exitDelay <= 0) this.startEntryTween()
       return
     }
 
-    if (
-      (!this.wrapping || this.wrap.active) &&
-      this.progress >= this.wrap.threshold
-    ) {
-      this.progress -= this.wrap.threshold
-      this.wrap.active = false
-      this.tileX = wrapX(this.tileX + C.DX[this.dir], this.cols)
-      this.tileY = wrapY(this.tileY + C.DY[this.dir], this.rows)
-
-      const newDir = this.chooseDir(
-        playerTileX,
-        playerTileY,
-        playerDir,
-        blinkyPos,
-      )
-      if (newDir !== -1 && newDir !== this.dir) {
-        this.dir = newDir
+    if (this.wrapTimer > 0) {
+      this.wrapTimer -= delta
+      if (this.wrapTimer <= 0) {
+        this.startEntryTween()
       }
+      return
     }
 
-    const { x: fracX, y: fracY } = moveFrac(
-      this,
-      this.progress,
-      this.wrap.active,
-    )
-    this.x = fracX * C.CELL + C.CELL
-    this.y = fracY * C.CELL + C.CELL
-    this.sprite.setPosition(this.x, this.y)
-    this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+    const playerTileX = this.scene.player.tileX
+    const playerTileY = this.scene.player.tileY
+    const playerDir = this.scene.player.dir
+    this.drawDebugLine(playerTileX, playerTileY, playerDir)
     this.emitSwimTrail(delta)
+
+    if (!this.moveTween) {
+      this.startNextTween()
+    }
+  }
+
+  private addTween(
+    x: number,
+    y: number,
+    steps: number,
+    ease: string,
+    onComplete: () => void,
+  ) {
+    const { speed } = ENEMY_TYPES[this.enemyType]
+    this.moveTween = this.scene.tweens.add({
+      targets: this.sprite,
+      x,
+      y,
+      duration: (steps * 1000) / speed,
+      ease,
+      onComplete,
+    })
+  }
+
+  private handleArrival(stop: Stop) {
+    this.moveTween = null
+    this.nextStop = null
+    this.tileX = stop.landTileX
+    this.tileY = stop.landTileY
+    if (stop.isWrap) {
+      this.sprite.setVisible(false)
+      this.wrapTimer = C.WRAP_DELAY
+    } else {
+      this.startNextTween()
+    }
+  }
+
+  private startEntryTween() {
+    const { easeIn, easeOut } = ENEMY_TYPES[this.enemyType]
+    const stop = this.findNextStop()
+    if (!stop) return
+
+    const entryX = (this.tileX - C.DX[this.dir] * 2) * C.CELL + C.CELL
+    const entryY = (this.tileY - C.DY[this.dir] * 2) * C.CELL + C.CELL
+    this.sprite.setPosition(entryX, entryY).setVisible(true)
+
+    const outSteps = stop.isWrap || !easeOut ? 0 : Math.min(2, stop.steps)
+    const midSteps = stop.steps - outSteps
+    const inSteps = 2
+
+    const afterMidX = stop.toX - C.DX[this.dir] * outSteps * C.CELL
+    const afterMidY = stop.toY - C.DY[this.dir] * outSteps * C.CELL
+
+    const startOut = () =>
+      this.addTween(stop.toX, stop.toY, outSteps * 2, 'Quad.easeOut', () =>
+        this.handleArrival(stop),
+      )
+    const startMid = () =>
+      midSteps > 0
+        ? this.addTween(afterMidX, afterMidY, midSteps, 'Linear', () => {
+            this.moveTween = null
+            outSteps > 0 ? startOut() : this.handleArrival(stop)
+          })
+        : startOut()
+
+    if (easeIn) {
+      const afterInX = afterMidX - C.DX[this.dir] * midSteps * C.CELL
+      const afterInY = afterMidY - C.DY[this.dir] * midSteps * C.CELL
+      this.addTween(afterInX, afterInY, inSteps * 2, 'Quad.easeIn', () => {
+        this.moveTween = null
+        startMid()
+      })
+    } else {
+      this.addTween(afterMidX, afterMidY, inSteps + midSteps, 'Linear', () => {
+        this.moveTween = null
+        outSteps > 0 ? startOut() : this.handleArrival(stop)
+      })
+    }
+  }
+
+  private startNextTween() {
+    const player = this.scene.player
+    const newDir = this.chooseDir(player.tileX, player.tileY, player.dir)
+    if (newDir !== -1) this.dir = newDir
+    this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+
+    const stop = this.findNextStop()
+    if (!stop) return
+    this.nextStop = stop
+
+    const { easeIn, easeOut } = ENEMY_TYPES[this.enemyType]
+    // Ease phases use 2× duration: for Quad.easeIn/Out, velocity at the handoff
+    // point equals 2×(distance/duration), so doubling duration makes it match full speed.
+    const inSteps = !easeIn ? 0 : Math.min(2, stop.steps)
+    const outSteps =
+      stop.isWrap || !easeOut ? 0 : Math.min(2, stop.steps - inSteps)
+    const midSteps = stop.steps - inSteps - outSteps
+
+    const afterInX = stop.toX - C.DX[this.dir] * (outSteps + midSteps) * C.CELL
+    const afterInY = stop.toY - C.DY[this.dir] * (outSteps + midSteps) * C.CELL
+    const afterMidX = stop.toX - C.DX[this.dir] * outSteps * C.CELL
+    const afterMidY = stop.toY - C.DY[this.dir] * outSteps * C.CELL
+
+    const startOut = () =>
+      outSteps > 0
+        ? this.addTween(stop.toX, stop.toY, outSteps * 2, 'Quad.easeOut', () =>
+            this.handleArrival(stop),
+          )
+        : this.handleArrival(stop)
+    const startMid = () =>
+      midSteps > 0
+        ? this.addTween(afterMidX, afterMidY, midSteps, 'Linear', () => {
+            this.moveTween = null
+            startOut()
+          })
+        : startOut()
+
+    if (inSteps > 0) {
+      this.addTween(afterInX, afterInY, inSteps * 2, 'Quad.easeIn', () => {
+        this.moveTween = null
+        startMid()
+      })
+    } else {
+      startMid()
+    }
+  }
+
+  /** Walk forward in the current direction until we hit an intersection or a wrap boundary. */
+  private findNextStop(): Stop | null {
+    let tx = this.tileX
+    let ty = this.tileY
+    let steps = 0
+
+    while (true) {
+      if (isWrapping(tx, ty, this.dir, this.cols, this.rows)) {
+        // Tween off-screen to the unwrapped pixel, then hide and teleport
+        const landTileX = wrapX(tx + C.DX[this.dir], this.cols)
+        const landTileY = wrapY(ty + C.DY[this.dir], this.rows)
+        return {
+          toX:
+            (tx + C.DX[this.dir]) * C.CELL + C.CELL + C.DX[this.dir] * C.CELL,
+          toY:
+            (ty + C.DY[this.dir]) * C.CELL + C.CELL + C.DY[this.dir] * C.CELL,
+          landTileX,
+          landTileY,
+          steps: steps + 2,
+          isWrap: true,
+        }
+      }
+
+      const nx = wrapX(tx + C.DX[this.dir], this.cols)
+      const ny = wrapY(ty + C.DY[this.dir], this.rows)
+      steps++
+
+      const canGoForward = canMove(this.grid, nx, ny, this.dir, false)
+      if (!canGoForward) {
+        return {
+          toX: nx * C.CELL + C.CELL,
+          toY: ny * C.CELL + C.CELL,
+          landTileX: nx,
+          landTileY: ny,
+          steps,
+          isWrap: false,
+        }
+      }
+
+      let hasOtherOptions = false
+      for (let d = 0; d < 4; d++) {
+        if (
+          d !== this.dir &&
+          d !== OPPOSITE[this.dir] &&
+          canMove(this.grid, nx, ny, d, false)
+        ) {
+          hasOtherOptions = true
+          break
+        }
+      }
+
+      if (hasOtherOptions) {
+        return {
+          toX: nx * C.CELL + C.CELL,
+          toY: ny * C.CELL + C.CELL,
+          landTileX: nx,
+          landTileY: ny,
+          steps,
+          isWrap: false,
+        }
+      }
+
+      tx = nx
+      ty = ny
+    }
   }
 
   private drawDebugLine(
     playerTileX: number,
     playerTileY: number,
     playerDir: number,
-    blinkyPos: TilePos,
   ) {
     if (!this.debugLine) return
-    const target = this.getTarget(
-      playerTileX,
-      playerTileY,
-      playerDir,
-      blinkyPos,
+    const target = this.getTarget(playerTileX, playerTileY, playerDir)
+    const fromX = this.nextStop?.landTileX ?? this.tileX
+    const fromY = this.nextStop?.landTileY ?? this.tileY
+    const path = this.tracePath(fromX, fromY, playerTileX, playerTileY, playerDir)
+    drawGhostDebugLine(
+      { ...this, x: this.sprite.x, y: this.sprite.y },
+      target,
+      path,
     )
-    const path = this.tracePath(playerTileX, playerTileY, playerDir, blinkyPos)
-    drawGhostDebugLine(this, target, path)
   }
 
   private getTarget(
     playerTileX: number,
     playerTileY: number,
     playerDir: number,
-    blinkyPos: TilePos,
   ): TilePos {
     if (this.aiType === 2) {
       // 3 tiles ahead of player
       return {
         x: wrapX(playerTileX + C.DX[playerDir] * 3, this.cols),
         y: wrapY(playerTileY + C.DY[playerDir] * 3, this.rows),
-      }
-    }
-
-    if (this.aiType === 3) {
-      // Inky: pivot = 2 tiles ahead of player, target = 2*pivot - blinky
-      const pivotX = playerTileX + C.DX[playerDir] * 2
-      const pivotY = playerTileY + C.DY[playerDir] * 2
-      return {
-        x: wrapX(2 * pivotX - blinkyPos.x, this.cols),
-        y: wrapY(2 * pivotY - blinkyPos.y, this.rows),
       }
     }
 
@@ -219,8 +332,8 @@ export class GhostSprite {
   private emitSwimTrail(delta: number) {
     this.swimTrailTimer = Math.max(0, this.swimTrailTimer - delta)
     if (this.swimTrailTimer > 0) return
-    const tailX = this.x - C.DX[this.dir] * C.CELL * 0.7
-    const tailY = this.y - C.DY[this.dir] * C.CELL * 0.7
+    const tailX = this.sprite.x - C.DX[this.dir] * C.CELL * 0.7
+    const tailY = this.sprite.y - C.DY[this.dir] * C.CELL * 0.7
     this.swimTrail.emitParticleAt(tailX, tailY, 1)
     this.swimTrailTimer = ENEMY_TYPES[this.enemyType].swimTrailInterval ?? 200
   }
@@ -229,14 +342,8 @@ export class GhostSprite {
     playerTileX: number,
     playerTileY: number,
     playerDir: number,
-    blinkyPos: TilePos,
   ): number {
-    const target = this.getTarget(
-      playerTileX,
-      playerTileY,
-      playerDir,
-      blinkyPos,
-    )
+    const target = this.getTarget(playerTileX, playerTileY, playerDir)
 
     // BFS — guarantees shortest path and no cycles
     type Node = { x: number; y: number; firstDir: number }
@@ -282,31 +389,27 @@ export class GhostSprite {
   }
 
   private tracePath(
+    fromTileX: number,
+    fromTileY: number,
     playerTileX: number,
     playerTileY: number,
     playerDir: number,
-    blinkyPos: TilePos,
   ): TilePos[] {
-    const target = this.getTarget(
-      playerTileX,
-      playerTileY,
-      playerDir,
-      blinkyPos,
-    )
+    const target = this.getTarget(playerTileX, playerTileY, playerDir)
     // BFS — reconstruct the full tile path to target
     type Node = { x: number; y: number; parent: Node | null }
     const visited = new Map<string, Node>()
     const queue: Node[] = []
-    const startKey = `${this.tileX},${this.tileY}`
-    const startNode: Node = { x: this.tileX, y: this.tileY, parent: null }
+    const startKey = `${fromTileX},${fromTileY}`
+    const startNode: Node = { x: fromTileX, y: fromTileY, parent: null }
     visited.set(startKey, startNode)
 
     // Seed only from current direction (ghost can't reverse mid-tile)
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[this.dir]) continue
-      if (!canMove(this.grid, this.tileX, this.tileY, dir, false)) continue
-      const nx = wrapX(this.tileX + C.DX[dir], this.cols)
-      const ny = wrapY(this.tileY + C.DY[dir], this.rows)
+      if (!canMove(this.grid, fromTileX, fromTileY, dir, false)) continue
+      const nx = wrapX(fromTileX + C.DX[dir], this.cols)
+      const ny = wrapY(fromTileY + C.DY[dir], this.rows)
       const key = `${nx},${ny}`
       if (!visited.has(key)) {
         const node: Node = { x: nx, y: ny, parent: startNode }
@@ -336,7 +439,7 @@ export class GhostSprite {
       }
     }
 
-    if (!found) return [{ x: this.tileX, y: this.tileY }]
+    if (!found) return [{ x: fromTileX, y: fromTileY }]
 
     // Walk parent chain to build path
     const reversed: TilePos[] = []

@@ -6,6 +6,8 @@ export interface EnemyConfig {
   aiType: 1 | 2 | 3 | 4
   frameRate?: number
   swimTrailInterval?: number
+  easeIn?: boolean
+  easeOut?: boolean
 }
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
@@ -18,5 +20,11 @@ export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
   blob: { speed: GHOST_SPEED, aiType: 1 },
   roach: { speed: GHOST_SPEED, aiType: 1 },
   turtle: { speed: GHOST_SPEED, aiType: 1 },
-  oct: { speed: GHOST_SPEED * 1.5, aiType: 1, frameRate: 2 },
+  oct: {
+    speed: GHOST_SPEED * 2.5,
+    aiType: 1,
+    frameRate: 2,
+    easeOut: true,
+    swimTrailInterval: 150,
+  },
 }

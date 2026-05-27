@@ -102,8 +102,7 @@ export class Game extends Scene {
 
     this.maze.updateGlow(_time)
     const scaledDelta = delta * TIMESCALE
-    const blinkyPos = { x: this.ghosts[0].tileX, y: this.ghosts[0].tileY }
-    for (const g of this.ghosts) g.update(scaledDelta, blinkyPos)
+    for (const g of this.ghosts) g.update(scaledDelta)
     this.player.update(scaledDelta, this.cursors)
   }
 
