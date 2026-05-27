@@ -15,7 +15,7 @@ export interface EnemyConfig {
 }
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
-  teeth2: { speed: GHOST_SPEED, aiType: 1 },
+  teeth2: { speed: GHOST_SPEED * 1.5, aiType: 1, easeOut: true },
   naut: {
     speed: GHOST_SPEED * 1,
     aiType: 3,
@@ -26,7 +26,7 @@ export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
   roach: { speed: GHOST_SPEED, aiType: 1 },
   oct: {
     speed: GHOST_SPEED * 2.5,
-    aiType: 1,
+    aiType: 2,
     frameRate: 2,
     easeOut: true,
     canReverse: true,
