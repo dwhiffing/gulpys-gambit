@@ -39,6 +39,7 @@ export class PlayerSprite {
   y: number
   sprite: Phaser.Physics.Arcade.Sprite
   private glow!: Phaser.Filters.Glow
+  private glowTarget = -1
   private tintOverlay!: Phaser.GameObjects.Sprite
   spinning = false
   private dashCooldown = 0
@@ -97,6 +98,7 @@ export class PlayerSprite {
   die() {
     this.spinning = false
     this.sprite.setAngle(0).setFlipX(false).play('player-die')
+    this.tintOverlay.setVisible(false)
   }
 
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
@@ -118,6 +120,8 @@ export class PlayerSprite {
       })
     }
     if (this.wrap.tick(delta, this)) return false
+    this.body.enable = true
+    this.tintOverlay.setVisible(this.sprite.visible)
 
     if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
     else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
@@ -224,6 +228,8 @@ export class PlayerSprite {
         this.progress = 2
         this.wrap.trigger()
         this.sprite.setVisible(false)
+        this.tintOverlay.setVisible(false)
+        this.body.enable = false
         this.updatePosition()
         return true
       }
@@ -311,16 +317,13 @@ export class PlayerSprite {
     const { dx, dy } = this.mouthDir
     const shift = CELL * 0.55
     const offset = CELL - radius
-    ;(this.sprite.body as Phaser.Physics.Arcade.Body).setCircle(
-      radius,
-      offset + dx * shift,
-      offset + dy * shift,
-    )
+    this.body.setCircle(radius, offset + dx * shift, offset + dy * shift)
   }
 
   private updateGlow() {
     const target = this.speedRatio >= 1.9 ? 1.5 : 0.5
-    if (Math.abs(this.glow.outerStrength - target) > 0.01) {
+    if (target !== this.glowTarget) {
+      this.glowTarget = target
       this.scene.tweens.killTweensOf(this.glow)
       this.scene.tweens.add({
         targets: this.glow,
@@ -420,6 +423,9 @@ export class PlayerSprite {
     }
   }
 
+  private get body() {
+    return this.sprite.body as Phaser.Physics.Arcade.Body
+  }
   private get angle() {
     const { dx, dy } = this.mouthDir
     return Math.atan2(-dy, -dx)
