@@ -9,18 +9,20 @@ export interface EnemyConfig {
   easeIn?: boolean
   easeOut?: boolean
   roundedCorners?: boolean
+  mineInterval?: number
+  mineLifetime?: number
 }
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
   teeth2: { speed: GHOST_SPEED, aiType: 1 },
-  naut: { speed: GHOST_SPEED, aiType: 1 },
+  naut: { speed: GHOST_SPEED, aiType: 1, mineInterval: 3, mineLifetime: 8000 },
   angler1: { speed: GHOST_SPEED, aiType: 1 },
   roach: { speed: GHOST_SPEED, aiType: 1 },
   oct: {
     speed: GHOST_SPEED * 2.5,
     aiType: 1,
     frameRate: 2,
-    // easeOut: true,
+    easeOut: true,
     swimTrailInterval: 150,
     roundedCorners: true,
   },

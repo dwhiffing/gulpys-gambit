@@ -13,6 +13,7 @@ export class Game extends Scene {
   player!: PlayerSprite
   private ghosts!: GhostSprite[]
   private ghostGroup!: Phaser.Physics.Arcade.Group
+  mineGroup!: Phaser.Physics.Arcade.StaticGroup
   private cursors!: Types.Input.Keyboard.CursorKeys
   private bg!: Phaser.GameObjects.TileSprite
   private bgDisplacement!: Phaser.Filters.Displacement
@@ -52,6 +53,8 @@ export class Game extends Scene {
 
     this.player = new PlayerSprite(this)
 
+    this.mineGroup = this.physics.add.staticGroup()
+
     this.ghostGroup = this.physics.add.group()
     this.ghosts = this.maze.spawners.map((spawner, i) => {
       const g = new GhostSprite(this, spawner, i)
@@ -77,10 +80,23 @@ export class Game extends Scene {
       },
     )
 
+    // Mine overlap — player steps on a dropped mine
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.mineGroup,
+      (_player, mine) => {
+        ;(mine as Phaser.Physics.Arcade.Sprite)
+          .disableBody(true, true)
+          .setVisible(false)
+        this.killPlayer()
+      },
+      () => this.gameState === 'playing',
+    )
+
     // Ghost overlap — process callback filters out states that don't collide
     this.physics.add.overlap(
       this.player.sprite,
-      this.ghostGroup,
+      [this.ghostGroup, this.mineGroup],
       (_player, _ghostSprite) => {
         this.killPlayer()
       },
@@ -106,6 +122,47 @@ export class Game extends Scene {
     const scaledDelta = delta * TIMESCALE
     for (const g of this.ghosts) g.update(scaledDelta)
     this.player.update(scaledDelta, this.cursors)
+  }
+
+  dropMine(tileX: number, tileY: number, lifetime?: number) {
+    const px = tileX * CELL + CELL
+    const py = tileY * CELL + CELL
+    const occupied = (
+      this.mineGroup.getChildren() as Phaser.Physics.Arcade.Sprite[]
+    ).some((m) => m.active && m.x === px && m.y === py)
+    if (occupied) return
+    const mine = this.mineGroup.create(
+      px,
+      py,
+      'dots',
+      0,
+    ) as Phaser.Physics.Arcade.Sprite
+    mine.setDepth(1)
+    mine.body!.setCircle(CELL * 0.4, CELL * 0.6, CELL * 0.6)
+    this.mineGroup.refresh()
+
+    if (lifetime) {
+      const blinkDelay = Math.max(0, lifetime - 2000)
+      this.time.delayedCall(blinkDelay, () => {
+        if (!mine.active) return
+        this.tweens.add({
+          targets: mine,
+          alpha: 0.2,
+          duration: 400,
+          yoyo: true,
+          repeat: -1,
+        })
+      })
+      this.time.delayedCall(lifetime, () => {
+        if (!mine.active) return
+        this.tweens.killTweensOf(mine).add({
+          targets: mine,
+          alpha: 0,
+          duration: 400,
+        })
+        mine.disableBody(true)
+      })
+    }
   }
 
   private killPlayer() {

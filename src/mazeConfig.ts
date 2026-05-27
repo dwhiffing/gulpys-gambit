@@ -45,9 +45,9 @@ export const MAZE_CONFIG: MazeConfig = {
   loopFactor: 0.2,
   wraps: { x: 2, y: 1 },
   ghosts: {
-    oct: 1,
+    oct: 0,
     teeth2: 0,
-    naut: 0,
+    naut: 1,
     angler1: 0,
     roach: 0,
   },

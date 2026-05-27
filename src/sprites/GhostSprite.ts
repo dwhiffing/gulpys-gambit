@@ -35,6 +35,7 @@ export class GhostSprite {
   private aiType: 1 | 2 | 3 | 4
   private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
   private swimTrailTimer = 0
+  private intersectionCount = 0
   cols!: number
   rows!: number
   debugLine: Phaser.GameObjects.Graphics | null = null
@@ -131,6 +132,15 @@ export class GhostSprite {
     })
   }
 
+  private maybeDropMine(tileX: number, tileY: number) {
+    const { mineInterval, mineLifetime } = ENEMY_TYPES[this.enemyType]
+    if (!mineInterval) return
+    this.intersectionCount++
+    if (this.intersectionCount % mineInterval === 0) {
+      this.scene.dropMine(tileX, tileY, mineLifetime)
+    }
+  }
+
   private handleArrival(stop: Stop) {
     this.moveTween = null
     this.nextStop = null
@@ -141,6 +151,7 @@ export class GhostSprite {
       this.wrapTimer = C.WRAP_DELAY
     } else {
       this.atIntersection = true
+      this.maybeDropMine(stop.landTileX, stop.landTileY)
       this.startNextTween()
     }
   }
@@ -228,6 +239,7 @@ export class GhostSprite {
         this.moveTween = null
         this.tileX += C.DX[newDir]
         this.tileY += C.DY[newDir]
+        this.maybeDropMine(this.tileX, this.tileY)
         this.startNextTween()
       })
       return
@@ -479,6 +491,7 @@ export class GhostSprite {
         this.tileY = stop.landTileY + C.DY[futureDir]
         this.dir = futureDir
         this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+        this.maybeDropMine(stop.landTileX, stop.landTileY)
         this.startNextTween()
       })
     })
