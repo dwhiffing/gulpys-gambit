@@ -11,6 +11,7 @@ export interface EnemyConfig {
   roundedCorners?: boolean
   mineInterval?: number
   mineLifetime?: number
+  canReverse?: boolean
 }
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {

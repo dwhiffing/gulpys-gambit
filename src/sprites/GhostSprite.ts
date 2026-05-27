@@ -425,6 +425,7 @@ export class GhostSprite {
     playerDir: number,
   ): number {
     const target = this.getTarget(playerTileX, playerTileY, playerDir)
+    const canReverse = ENEMY_TYPES[this.enemyType].canReverse ?? false
 
     // BFS — guarantees shortest path and no cycles
     type Node = { x: number; y: number; firstDir: number }
@@ -432,7 +433,7 @@ export class GhostSprite {
     const queue: Node[] = []
 
     for (let dir = 0; dir < 4; dir++) {
-      if (dir === OPPOSITE[fromDir]) continue
+      if (!canReverse && dir === OPPOSITE[fromDir]) continue
       if (!canMove(this.grid, fromTileX, fromTileY, dir, false)) continue
       const nx = wrapX(fromTileX + C.DX[dir], this.cols)
       const ny = wrapY(fromTileY + C.DY[dir], this.rows)
@@ -459,7 +460,7 @@ export class GhostSprite {
       }
     }
 
-    // Target unreachable — any valid non-reverse move
+    // Target unreachable — any valid move (prefer non-reverse)
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[fromDir]) continue
       if (canMove(this.grid, fromTileX, fromTileY, dir, false)) return dir
