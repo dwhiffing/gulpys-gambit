@@ -35,3 +35,12 @@ export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
 export const DOT_EFFECT_INTERVAL = 170 // ms between dot flash/particle/glow effects
 
 export const GHOST_SPEED = 2.5
+
+export const BUBBLE_EMITTER_CONFIG = {
+  frame: 1,
+  scale: { start: 0.5, end: 1.5 },
+  alpha: { start: 0.4, end: 0 },
+  lifespan: { min: 300, max: 2500 },
+  speed: { min: 2, max: 9 },
+  emitting: false,
+}

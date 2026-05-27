@@ -32,6 +32,8 @@ export class GhostSprite {
   colorIndex: number
   enemyType: EnemyType
   private aiType: 1 | 2 | 3 | 4
+  private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
+  private swimTrailTimer = 0
   cols!: number
   rows!: number
   debugLine: Phaser.GameObjects.Graphics | null = null
@@ -60,6 +62,10 @@ export class GhostSprite {
         frameRate: ENEMY_TYPES[spawner.enemyType].frameRate,
       })
     this.sprite.body!.setCircle(C.CELL * 0.6, C.CELL * 0.4, C.CELL * 0.4)
+
+    this.swimTrail = scene.add
+      .particles(0, 0, 'dots', C.BUBBLE_EMITTER_CONFIG)
+      .setDepth(1)
 
     if (DEBUG_GHOST_TARGETS) {
       this.debugLine = scene.add.graphics().setDepth(1)
@@ -162,6 +168,7 @@ export class GhostSprite {
     this.y = fracY * C.CELL + C.CELL
     this.sprite.setPosition(this.x, this.y)
     this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
+    this.emitSwimTrail(delta)
   }
 
   private drawDebugLine(
@@ -207,6 +214,15 @@ export class GhostSprite {
 
     // aiType 1: target player exactly
     return { x: playerTileX, y: playerTileY }
+  }
+
+  private emitSwimTrail(delta: number) {
+    this.swimTrailTimer = Math.max(0, this.swimTrailTimer - delta)
+    if (this.swimTrailTimer > 0) return
+    const tailX = this.x - C.DX[this.dir] * C.CELL * 0.7
+    const tailY = this.y - C.DY[this.dir] * C.CELL * 0.7
+    this.swimTrail.emitParticleAt(tailX, tailY, 1)
+    this.swimTrailTimer = ENEMY_TYPES[this.enemyType].swimTrailInterval ?? 200
   }
 
   private chooseDir(

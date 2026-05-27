@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser'
 import {
   ANGLES,
+  BUBBLE_EMITTER_CONFIG,
   CELL,
   DASH_COOLDOWN,
   DASH_DISTANCE,
@@ -455,14 +456,7 @@ export class PlayerSprite {
       .setDepth(-1)
 
     this.swimTrail = this.scene.add
-      .particles(0, 0, 'dots', {
-        frame: 1,
-        scale: { start: 0.5, end: 1.5 },
-        alpha: { start: 0.6, end: 0 },
-        lifespan: { min: 300, max: 2500 },
-        speed: { min: 2, max: 9 },
-        emitting: false,
-      })
+      .particles(0, 0, 'dots', BUBBLE_EMITTER_CONFIG)
       .setDepth(1)
   }
 
