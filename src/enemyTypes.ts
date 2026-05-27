@@ -3,7 +3,7 @@ import { GHOST_SPEED } from './constants'
 
 export interface EnemyConfig {
   speed: number
-  aiType: 1 | 2 | 3 | 4
+  aiType: 1 | 2 | 3
   frameRate?: number
   swimTrailInterval?: number
   easeIn?: boolean
@@ -16,7 +16,12 @@ export interface EnemyConfig {
 
 export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
   teeth2: { speed: GHOST_SPEED, aiType: 1 },
-  naut: { speed: GHOST_SPEED, aiType: 1, mineInterval: 3, mineLifetime: 8000 },
+  naut: {
+    speed: GHOST_SPEED * 1,
+    aiType: 3,
+    mineInterval: 3,
+    mineLifetime: 8000,
+  },
   angler1: { speed: GHOST_SPEED, aiType: 1 },
   roach: { speed: GHOST_SPEED, aiType: 1 },
   oct: {
@@ -24,6 +29,7 @@ export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
     aiType: 1,
     frameRate: 2,
     easeOut: true,
+    canReverse: true,
     swimTrailInterval: 150,
     roundedCorners: true,
   },

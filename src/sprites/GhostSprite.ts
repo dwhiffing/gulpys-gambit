@@ -32,10 +32,11 @@ export class GhostSprite {
 
   colorIndex: number
   enemyType: EnemyType
-  private aiType: 1 | 2 | 3 | 4
+  private aiType: 1 | 2 | 3
   private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
   private swimTrailTimer = 0
   private intersectionCount = 0
+  private wanderTarget: TilePos | null = null
   cols!: number
   rows!: number
   debugLine: Phaser.GameObjects.Graphics | null = null
@@ -152,6 +153,7 @@ export class GhostSprite {
     } else {
       this.atIntersection = true
       this.maybeDropMine(stop.landTileX, stop.landTileY)
+      this.maybePickNewWanderTarget(stop.landTileX, stop.landTileY)
       this.startNextTween()
     }
   }
@@ -240,6 +242,7 @@ export class GhostSprite {
         this.tileX += C.DX[newDir]
         this.tileY += C.DY[newDir]
         this.maybeDropMine(this.tileX, this.tileY)
+        this.maybePickNewWanderTarget(this.tileX, this.tileY)
         this.startNextTween()
       })
       return
@@ -403,6 +406,11 @@ export class GhostSprite {
       }
     }
 
+    if (this.aiType === 3) {
+      if (!this.wanderTarget) this.pickWanderTarget()
+      return this.wanderTarget ?? { x: playerTileX, y: playerTileY }
+    }
+
     // aiType 1: target player exactly
     return { x: playerTileX, y: playerTileY }
   }
@@ -493,6 +501,7 @@ export class GhostSprite {
         this.dir = futureDir
         this.sprite.setFlipX(this.dir === C.DIRS.LEFT)
         this.maybeDropMine(stop.landTileX, stop.landTileY)
+        this.maybePickNewWanderTarget(stop.landTileX, stop.landTileY)
         this.startNextTween()
       })
     })
@@ -520,6 +529,56 @@ export class GhostSprite {
       },
       onComplete,
     })
+  }
+
+  private maybePickNewWanderTarget(tileX: number, tileY: number) {
+    if (this.aiType !== 3) return
+    if (
+      this.wanderTarget &&
+      (tileX !== this.wanderTarget.x || tileY !== this.wanderTarget.y)
+    )
+      return
+    this.pickWanderTarget()
+  }
+
+  private isIntersectionOrTurn(x: number, y: number): boolean {
+    const passable: number[] = []
+    for (let d = 0; d < 4; d++) {
+      if (canMove(this.grid, x, y, d, false)) passable.push(d)
+    }
+    if (passable.length !== 2) return passable.length > 0
+    // Two passable neighbors — only a straight corridor if they're opposite
+    return passable[0] !== OPPOSITE[passable[1]]
+  }
+
+  private pickWanderTarget() {
+    // BFS from current position to find all reachable tiles
+    const visited = new Set<string>()
+    const queue: TilePos[] = [{ x: this.tileX, y: this.tileY }]
+    visited.add(`${this.tileX},${this.tileY}`)
+    const candidates: TilePos[] = []
+
+    while (queue.length > 0) {
+      const { x, y } = queue.shift()!
+      const dist = Math.abs(x - this.tileX) + Math.abs(y - this.tileY)
+      if (dist >= 5 && this.isIntersectionOrTurn(x, y)) {
+        candidates.push({ x, y })
+      }
+      for (let d = 0; d < 4; d++) {
+        if (!canMove(this.grid, x, y, d, false)) continue
+        const nx = wrapX(x + C.DX[d], this.cols)
+        const ny = wrapY(y + C.DY[d], this.rows)
+        const key = `${nx},${ny}`
+        if (!visited.has(key)) {
+          visited.add(key)
+          queue.push({ x: nx, y: ny })
+        }
+      }
+    }
+
+    if (candidates.length === 0) return
+    this.wanderTarget =
+      candidates[Math.floor(Math.random() * candidates.length)]
   }
 
   private tracePath(
