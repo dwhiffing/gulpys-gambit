@@ -84,6 +84,12 @@ export class Maze {
     this.glowSprites.push({ dot, img, phase })
   }
 
+  hideAllGlows() {
+    for (const { img } of this.glowSprites) {
+      img.setVisible(false)
+    }
+  }
+
   updateGlow(time: number) {
     const speed = 0.003
     for (const { dot, img, phase } of this.glowSprites) {

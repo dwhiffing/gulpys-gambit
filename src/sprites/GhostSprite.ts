@@ -17,7 +17,7 @@ type Stop = {
   isWrap: boolean
 }
 
-export const DEBUG_GHOST_TARGETS = true
+export const DEBUG_GHOST_TARGETS = false
 
 export class GhostSprite {
   tileX: number
@@ -79,6 +79,11 @@ export class GhostSprite {
 
   get grid() {
     return this.scene.maze.grid
+  }
+
+  stop() {
+    this.moveTween?.stop()
+    this.moveTween = null
   }
 
   update(delta: number) {
@@ -304,7 +309,13 @@ export class GhostSprite {
     const target = this.getTarget(playerTileX, playerTileY, playerDir)
     const fromX = this.nextStop?.landTileX ?? this.tileX
     const fromY = this.nextStop?.landTileY ?? this.tileY
-    const path = this.tracePath(fromX, fromY, playerTileX, playerTileY, playerDir)
+    const path = this.tracePath(
+      fromX,
+      fromY,
+      playerTileX,
+      playerTileY,
+      playerDir,
+    )
     drawGhostDebugLine(
       { ...this, x: this.sprite.x, y: this.sprite.y },
       target,

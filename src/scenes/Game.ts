@@ -69,7 +69,9 @@ export class Game extends Scene {
         this.player.collectDot()
 
         if (this.maze.dotGroup.countActive() === 0) {
+          this.maze.hideAllGlows()
           this.gameState = 'won'
+          for (const g of this.ghosts) g.stop()
           this.time.delayedCall(2000, () => this.scene.restart())
         }
       },
