@@ -1,4 +1,5 @@
 import { GameObjects, Scene } from 'phaser'
+import { NATIVE_H, NATIVE_W } from '../main'
 
 export class Menu extends Scene {
   title: GameObjects.Text
@@ -9,18 +10,19 @@ export class Menu extends Scene {
 
   create() {
     this.title = this.add
-      .text(512, 460, 'Main Menu', {
+      .text(NATIVE_W / 2, NATIVE_H / 2, "Gulpy's Gambit", {
         fontFamily: 'Arial Black',
         fontSize: 38,
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 8,
+        color: '#7294d6',
         align: 'center',
       })
       .setOrigin(0.5)
 
-    this.input.once('pointerdown', () => {
-      this.scene.start('Game')
+    this.input.keyboard!.once('keydown', () => {
+      this.scene.launch('Checkerboard', {
+        nextScene: 'Game',
+        stopScene: 'Menu',
+      })
     })
   }
 }
