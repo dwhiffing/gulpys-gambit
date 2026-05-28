@@ -23,7 +23,7 @@ export class Boot extends Scene {
   preload() {
     this.load.setPath('assets')
     this.load.image('background', 'background.png')
-    this.load.image('distort', 'noise.png')
+    this.load.image('distort', 'noise.jpg')
     this.load.spritesheet('player', 'player.png', {
       frameWidth: CELL * 2,
       frameHeight: CELL * 2,
