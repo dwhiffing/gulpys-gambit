@@ -24,6 +24,7 @@ export class Boot extends Scene {
     this.load.setPath('assets')
     this.load.image('background', 'background.png')
     this.load.image('distort', 'noise.jpg')
+    this.load.audio('music', 'game-dream.mp3')
     this.load.spritesheet('player', 'player.png', {
       frameWidth: CELL * 2,
       frameHeight: CELL * 2,
@@ -45,6 +46,40 @@ export class Boot extends Scene {
   create() {
     this.createAnimations()
     this.createGlowTextures()
+
+    const MUTE_KEY = 'gulpy-mute'
+    const states = ['all', 'sfx', 'mute'] as const
+    type MuteState = (typeof states)[number]
+
+    const saved = localStorage.getItem(MUTE_KEY) as MuteState | null
+    let stateIndex = Math.max(0, states.indexOf(saved as MuteState))
+
+    const soundManager = this.sound
+    const music = soundManager.add('music', { loop: true })
+
+    const applyState = (state: MuteState) => {
+      if (state === 'all') {
+        soundManager.mute = false
+        music.setMute(false)
+      } else if (state === 'sfx') {
+        soundManager.mute = false
+        music.setMute(true)
+      } else {
+        soundManager.mute = true
+      }
+    }
+
+    applyState(states[stateIndex])
+    music.play()
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() !== 'm') return
+      stateIndex = (stateIndex + 1) % states.length
+      const state = states[stateIndex]
+      localStorage.setItem(MUTE_KEY, state)
+      applyState(state)
+    })
+
     this.scene.launch('Checkerboard', {
       nextScene: 'Menu',
       stopScene: 'Boot',
