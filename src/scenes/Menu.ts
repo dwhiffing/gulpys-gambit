@@ -26,17 +26,42 @@ export class Menu extends Scene {
     this.glowSprites = []
     this.createLetterMaze()
 
-    this.input.keyboard!.once('keydown-Z', () => {
+    const isMobile = this.sys.game.device.input.touch
+
+    const startText = this.add
+      .text(
+        NATIVE_W / 2,
+        NATIVE_H - 90,
+        isMobile ? 'TAP TO START' : 'PRESS Z TO START',
+        { fontFamily: 'monospace', fontSize: '16px', color: '#7294d6' },
+      )
+      .setOrigin(0.5, 0.5)
+      .setDepth(2)
+
+    this.tweens.add({
+      targets: startText,
+      alpha: { from: 0, to: 0.7 },
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+
+    const startGame = () => {
       this.scene.launch('Checkerboard', {
         nextScene: 'Game',
         stopScene: 'Menu',
       })
-    })
+    }
+
+    this.input.keyboard!.once('keydown-Z', startGame)
+    this.input.once('pointerdown', startGame)
 
     ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(
       this,
       NATIVE_W,
       NATIVE_H,
+      0.1,
     ))
   }
 
@@ -71,12 +96,10 @@ export class Menu extends Scene {
       }
     }
 
-    const line1 = 'GULPYS'
+    const line1 = "GULPY'S"
     const line2 = 'GAMBIT'
-    const lineGap = 3
-    const totalH = LETTER_H * 2 + lineGap
-    const startY1 = Math.floor((rows - totalH) / 2) - 7
-    const startY2 = startY1 + LETTER_H + lineGap
+    const startY1 = 15
+    const startY2 = startY1 + 8
 
     const startX1 = Math.floor((cols - wordWidth(line1)) / 2)
     const startX2 = Math.floor((cols - wordWidth(line2)) / 2)
@@ -89,10 +112,20 @@ export class Menu extends Scene {
       }
     }
 
-    placeLine(startY1 - 4)
+    const carvePattern = (topLine: number, bottomLine: number) => {
+      placeLine(topLine)
+      placeLine(bottomLine)
+      for (let y = topLine + 1; y < bottomLine; y++) {
+        for (let x = 0; x < cols; x++) {
+          grid[y][x] = TILES.EMPTY
+        }
+      }
+    }
+
+    carvePattern(startY1 - 16, startY1 - 5)
     placeWord(line1, startX1, startY1)
     placeWord(line2, startX2, startY2)
-    placeLine(startY2 + LETTER_H + 3)
+    carvePattern(startY2 + LETTER_H + 4, startY2 + LETTER_H + 15)
 
     // Render wall sprites using the same bitmask logic as the game maze
     const isWall = (tx: number, ty: number) =>
@@ -104,16 +137,12 @@ export class Menu extends Scene {
 
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
-        if (grid[y][x] === TILES.EMPTY || grid[y][x] === TILES.POWER) {
-          const power = grid[y][x] === TILES.POWER
+        if (grid[y][x] === TILES.POWER) {
           const px = x * CELL + CELL / 2
           const py = y * CELL + CELL / 2
-          this.add
-            .sprite(px, py, 'dots', power ? 3 : 2)
-            .setDepth(1)
-            .setAlpha(1)
+          this.add.sprite(px, py, 'dots', 3).setDepth(1).setAlpha(1)
           const img = this.add
-            .image(px, py, power ? 'power-glow' : 'dot-glow')
+            .image(px, py, 'power-glow')
             .setBlendMode(Phaser.BlendModes.ADD)
             .setDepth(0)
           this.glowSprites.push({ img, phase: (px + py) / CELL / 7 })

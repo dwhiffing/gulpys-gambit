@@ -124,4 +124,11 @@ export const LETTER_BITMAPS: Record<string, number[][]> = {
     [0, 0, 1, 0, 0],
     [0, 0, 1, 0, 0],
   ],
+  "'": [
+    [1],
+    [1],
+    [0],
+    [0],
+    [0],
+  ],
 }

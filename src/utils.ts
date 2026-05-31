@@ -150,14 +150,20 @@ export function createScrollingBg(
   scene: Phaser.Scene,
   w: number,
   h: number,
-): { bg: Phaser.GameObjects.TileSprite; bgDisplacement: Phaser.Filters.Displacement } {
+  alpha = 0.2,
+): {
+  bg: Phaser.GameObjects.TileSprite
+  bgDisplacement: Phaser.Filters.Displacement
+} {
   scene.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
   const bg = scene.add
     .tileSprite(0, 0, w, h, 'background')
     .setOrigin(0)
-    .setAlpha(0.2)
+    .setAlpha(alpha)
     .setDepth(-1)
-  const bgDisplacement = bg.enableFilters().filters!.internal.addDisplacement('distort')
+  const bgDisplacement = bg
+    .enableFilters()
+    .filters!.internal.addDisplacement('distort')
   return { bg, bgDisplacement }
 }
 
