@@ -63,6 +63,10 @@ export class PlayerSprite {
   private eatToggle = 0
   private dotQueue = 0
   private dotQueueTimer = 0
+  private swipeDir = -1
+  private swipeDash = false
+  private touchStartX = 0
+  private touchStartY = 0
 
   constructor(private scene: Game) {
     this.tileX = scene.maze.playerSpawn.x
@@ -84,6 +88,31 @@ export class PlayerSprite {
         this.muted = !this.muted
         localStorage.setItem('muted', String(this.muted))
       })
+
+    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      this.touchStartX = p.x
+      this.touchStartY = p.y
+    })
+    scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      const dx = p.x - this.touchStartX
+      const dy = p.y - this.touchStartY
+      const MIN_SWIPE = 20
+      if (Math.abs(dx) < MIN_SWIPE && Math.abs(dy) < MIN_SWIPE) return
+      const dir =
+        Math.abs(dx) >= Math.abs(dy)
+          ? dx > 0
+            ? DIRS.RIGHT
+            : DIRS.LEFT
+          : dy > 0
+            ? DIRS.DOWN
+            : DIRS.UP
+      if (dir === this.dir) {
+        this.swipeDash = true
+      } else {
+        this.swipeDir = dir
+      }
+    })
+
     this.applyDir(this.dir)
   }
 
@@ -123,7 +152,10 @@ export class PlayerSprite {
     this.body.enable = true
     this.tintOverlay.setVisible(this.sprite.visible)
 
-    if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
+    if (this.swipeDir !== -1) {
+      this.nextDir = this.swipeDir
+      this.swipeDir = -1
+    } else if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
     else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
     else if (cursors.up.isDown) this.nextDir = DIRS.UP
     else if (cursors.down.isDown) this.nextDir = DIRS.DOWN
@@ -133,7 +165,8 @@ export class PlayerSprite {
         cursors.right.isDown ||
         cursors.left.isDown ||
         cursors.up.isDown ||
-        cursors.down.isDown
+        cursors.down.isDown ||
+        this.nextDir !== this.dir
       if (!anyDown) return
       this.waitingForInput = false
     }
@@ -152,11 +185,9 @@ export class PlayerSprite {
 
     const wasMoving = this.moving
 
-    if (
-      Phaser.Input.Keyboard.JustDown(this.zKey) &&
-      !this.dashing &&
-      this.dashCooldown === 0
-    ) {
+    const dashPressed = Phaser.Input.Keyboard.JustDown(this.zKey) || this.swipeDash
+    this.swipeDash = false
+    if (dashPressed && !this.dashing && this.dashCooldown === 0) {
       const tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
       const tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
       const tileOpen = canMove(this.grid, tileX, tileY, this.dir, false)
@@ -278,9 +309,9 @@ export class PlayerSprite {
           ? DIRS.UP
           : cursors.down.isDown
             ? DIRS.DOWN
-            : -1
+            : this.nextDir
 
-    if (heldDir === -1 || heldDir === this.dir) return false
+    if (heldDir === this.dir) return false
 
     const { dx, dy } = this.mouthDir
     const REACH = 1
