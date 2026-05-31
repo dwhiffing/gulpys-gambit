@@ -43,6 +43,7 @@ export class PlayerSprite {
   private glowSprite!: Phaser.GameObjects.Sprite
   private tintOverlay!: Phaser.GameObjects.Sprite
   spinning = false
+  dead = false
   private dashCooldown = 0
   private dashing = false
   private dashDistanceLeft = 0
@@ -64,6 +65,9 @@ export class PlayerSprite {
   private eatToggle = 0
   private dotQueue = 0
   private dotQueueTimer = 0
+  private stunned = false
+  pendingStun = false
+  onTileCross?: () => void
   private swipeDir = -1
   private swipeDash = false
   private touchStartX = 0
@@ -130,13 +134,45 @@ export class PlayerSprite {
   }
 
   die() {
+    this.dead = true
     this.spinning = false
     this.sprite.setAngle(0).setFlipX(false).play('player-die')
     this.glowSprite.setVisible(false)
     this.tintOverlay.setVisible(false)
   }
 
+  stun() {
+    this.stunned = true
+    this.moving = false
+    this.boostAmount = 0
+    this.boostSustainTimer = 0
+    this.glowSprite.setVisible(false)
+    this.tintOverlay.setAlpha(0)
+    this.sprite.setAlpha(0.5).stop()
+    this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: 0.25,
+      duration: 200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+  }
+
+  unstun() {
+    if (this.dead) return
+    this.stunned = false
+    this.scene.tweens.killTweensOf(this.sprite)
+    this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: 1,
+      duration: 300,
+      onComplete: () => this.glowSprite.setVisible(true),
+    })
+  }
+
   update(delta: number, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
+    if (this.stunned) return
     this.dashCooldown = Math.max(0, this.dashCooldown - delta)
     this.dotQueueTimer = Math.max(0, this.dotQueueTimer - delta)
     this.swimTrailTimer = Math.max(0, this.swimTrailTimer - delta)
@@ -191,7 +227,8 @@ export class PlayerSprite {
 
     const wasMoving = this.moving
 
-    const dashPressed = Phaser.Input.Keyboard.JustDown(this.zKey) || this.swipeDash
+    const dashPressed =
+      Phaser.Input.Keyboard.JustDown(this.zKey) || this.swipeDash
     this.swipeDash = false
     if (dashPressed && !this.dashing && this.dashCooldown === 0) {
       const tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
@@ -279,6 +316,13 @@ export class PlayerSprite {
         this.wrap.active = false
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
         this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
+
+        this.onTileCross?.()
+        if (this.stunned) {
+          this.progress = 0
+          this.updatePosition()
+          return true
+        }
 
         if (canMove(this.grid, this.tileX, this.tileY, this.nextDir, false)) {
           if (this.nextDir !== this.dir) {

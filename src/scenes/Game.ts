@@ -18,6 +18,7 @@ export class Game extends Scene {
   private bg!: Phaser.GameObjects.TileSprite
   private bgDisplacement!: Phaser.Filters.Displacement
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
+  private stunTimer: Phaser.Time.TimerEvent | null = null
   gameScale = 1
 
   constructor() {
@@ -28,7 +29,7 @@ export class Game extends Scene {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.gameState = 'playing'
 
-    const level = data?.level ?? 1
+    const level = data?.level ?? 6
     this.maze = new Maze(this, getMazeConfig(level))
 
     const mazeW = this.maze.cols * CELL
@@ -75,7 +76,7 @@ export class Game extends Scene {
       },
     )
 
-    // Mine overlap — player steps on a dropped mine
+    // Mine overlap — mark hit, stun fires on next tile cross
     this.physics.add.overlap(
       this.player.sprite,
       this.mineGroup,
@@ -83,15 +84,22 @@ export class Game extends Scene {
         ;(mine as Phaser.Physics.Arcade.Sprite)
           .disableBody(true, true)
           .setVisible(false)
-        this.stunPlayer()
+        this.player.pendingStun = true
       },
       () => this.gameState === 'playing',
     )
 
+    this.player.onTileCross = () => {
+      if (this.player.pendingStun) {
+        this.player.pendingStun = false
+        this.stunPlayer()
+      }
+    }
+
     // Ghost overlap — process callback filters out states that don't collide
     this.physics.add.overlap(
       this.player.sprite,
-      [this.ghostGroup, this.mineGroup],
+      this.ghostGroup,
       (_player, _ghostSprite) => {
         this.killPlayer()
       },
@@ -223,6 +231,12 @@ export class Game extends Scene {
     this.game.canvas.style.imageRendering = enabled ? 'auto' : 'pixelated'
   }
 
+  private stunPlayer() {
+    if (this.gameState !== 'playing') return
+    this.stunTimer?.remove()
+    this.player.stun()
+    this.stunTimer = this.time.delayedCall(1500, () => this.player.unstun())
+  }
 
   private killPlayer() {
     this.gameState = 'dying'
