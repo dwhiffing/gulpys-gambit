@@ -109,7 +109,7 @@ export class Maze {
             mask = buildWallMask(isWall, x, y)
             frame = wallFrame(mask)
           }
-          this.walls.push(this.scene.add.sprite(px, py, 'tiles', frame))
+          this.walls.push(this.scene.add.sprite(px, py, 'tiles', frame).setDepth(10))
         }
       }
     }

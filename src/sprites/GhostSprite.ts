@@ -63,7 +63,7 @@ export class GhostSprite {
 
     this.sprite = scene.physics.add
       .sprite(0, 0, 'sprites')
-      .setDepth(2)
+      .setDepth(7)
       .setVisible(false)
       .play({
         key: `fish-${this.enemyType}`,

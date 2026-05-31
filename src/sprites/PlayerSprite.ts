@@ -533,14 +533,14 @@ export class PlayerSprite {
   private createEatEffects() {
     this.glowSprite = this.scene.add
       .sprite(this.x, this.y, 'player', 0)
-      .setDepth(1)
+      .setDepth(6)
     this.glow = this.glowSprite
       .enableFilters()
       .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)
     this.glow.outerStrength = 0.5
     this.tintOverlay = this.scene.add
       .sprite(this.x, this.y, 'player', 0)
-      .setDepth(3)
+      .setDepth(8)
       .setTint(0xff7700)
       .setTintMode(Phaser.TintModes.FILL)
       .setAlpha(0)
