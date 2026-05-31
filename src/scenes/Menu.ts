@@ -116,7 +116,7 @@ export class Menu extends Scene {
             .image(px, py, power ? 'power-glow' : 'dot-glow')
             .setBlendMode(Phaser.BlendModes.ADD)
             .setDepth(0)
-          this.glowSprites.push({ img, phase: (px + py) / CELL })
+          this.glowSprites.push({ img, phase: (px + py) / CELL / 7 })
         }
         if (grid[y][x] !== TILES.WALL) continue
         const px = x * CELL + CELL / 2
@@ -128,10 +128,10 @@ export class Menu extends Scene {
   }
 
   update(_time: number) {
-    const speed = 0.003
+    const speed = 0.002
     for (const { img, phase } of this.glowSprites) {
       const t = Math.cos(_time * speed - phase) * 0.5 + 0.5
-      img.setAlpha(0.05 + t * t * 0.85)
+      img.setAlpha(0.05 + t ** 1.5 * 0.85)
     }
 
     updateScrollingBg(this.bg, this.bgDisplacement, _time)
