@@ -40,6 +40,7 @@ export class PlayerSprite {
   sprite: Phaser.Physics.Arcade.Sprite
   private glow!: Phaser.Filters.Glow
   private glowTarget = -1
+  private glowSprite!: Phaser.GameObjects.Sprite
   private tintOverlay!: Phaser.GameObjects.Sprite
   spinning = false
   private dashCooldown = 0
@@ -114,6 +115,10 @@ export class PlayerSprite {
     })
 
     this.applyDir(this.dir)
+    this.glowSprite
+      .setAngle(this.sprite.angle)
+      .setFlip(this.sprite.flipX, this.sprite.flipY)
+      .setFrame(this.sprite.frame.name)
   }
 
   get grid() {
@@ -127,6 +132,7 @@ export class PlayerSprite {
   die() {
     this.spinning = false
     this.sprite.setAngle(0).setFlipX(false).play('player-die')
+    this.glowSprite.setVisible(false)
     this.tintOverlay.setVisible(false)
   }
 
@@ -388,6 +394,11 @@ export class PlayerSprite {
       this.swimTrailTimer = interval
     }
     // this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
+    this.glowSprite
+      .setPosition(this.x, this.y)
+      .setAngle(this.sprite.angle)
+      .setFlip(this.sprite.flipX, this.sprite.flipY)
+      .setFrame(this.sprite.frame.name)
     this.tintOverlay
       .setPosition(this.x, this.y)
       .setAngle(this.sprite.angle)
@@ -472,7 +483,10 @@ export class PlayerSprite {
   }
 
   private createEatEffects() {
-    this.glow = this.sprite
+    this.glowSprite = this.scene.add
+      .sprite(this.x, this.y, 'player', 0)
+      .setDepth(1)
+    this.glow = this.glowSprite
       .enableFilters()
       .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)
     this.glow.outerStrength = 0.5

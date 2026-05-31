@@ -18,6 +18,7 @@ export class Game extends Scene {
   private bg!: Phaser.GameObjects.TileSprite
   private bgDisplacement!: Phaser.Filters.Displacement
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
+  gameScale = 1
 
   constructor() {
     super('Game')
@@ -32,6 +33,11 @@ export class Game extends Scene {
 
     const mazeW = this.maze.cols * CELL
     const mazeH = this.maze.rows * CELL
+    const { width, height } = this.scale.gameSize
+    this.gameScale = Math.min(width / (mazeW + CELL), height / (mazeH + CELL))
+    if (this.gameScale > 2) this.gameScale = 2
+    else if (this.gameScale < 1.5) this.gameScale = 1
+    else this.gameScale = 1.5
 
     this.createBackground(mazeW, mazeH)
 
@@ -96,32 +102,41 @@ export class Game extends Scene {
     )
     this.tweens.timeScale = TIMESCALE
     this.anims.globalTimeScale = TIMESCALE
+    const antialias = !Number.isInteger(this.gameScale)
+    this.game.events.once(Phaser.Core.Events.POST_RENDER, () =>
+      this.setAntialias(antialias),
+    )
   }
 
   private createBackground(mazeW: number, mazeH: number) {
     const { width, height } = this.scale.gameSize
-    const offsetX = Math.floor((width - mazeW) / 2)
-    const offsetY = Math.floor((height - mazeH) / 2)
-    this.cameras.main.scrollX = -offsetX
-    this.cameras.main.scrollY = -offsetY
+    const z = this.gameScale
+    this.cameras.main.setZoom(z).centerOn(mazeW / 2, mazeH / 2)
 
+    const visW = width / z
+    const visH = height / z
+    const worldLeft = mazeW / 2 - visW / 2
+    const worldTop = mazeH / 2 - visH / 2
     const borderDepth = 100
     const addBorder = (x: number, y: number, w: number, h: number) =>
       this.add
         .rectangle(x, y, w, h, 0x110525)
         .setOrigin(0)
-        .setScrollFactor(0)
         .setDepth(borderDepth)
-    if (offsetX > 0) {
-      addBorder(0, 0, offsetX, height)
-      addBorder(offsetX + mazeW, 0, offsetX + 1, height)
+    if (worldLeft < 0) {
+      addBorder(worldLeft, worldTop, -worldLeft, visH)
+      addBorder(mazeW, worldTop, -worldLeft, visH)
     }
-    if (offsetY > 0) {
-      addBorder(0, 0, width, offsetY)
-      addBorder(0, offsetY + mazeH, width, offsetY + 1)
+    if (worldTop < 0) {
+      addBorder(worldLeft, worldTop, visW, -worldTop)
+      addBorder(worldLeft, mazeH, visW, -worldTop)
     }
 
-    ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(this, mazeW, mazeH))
+    ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(
+      this,
+      mazeW,
+      mazeH,
+    ))
   }
 
   update(_time: number, delta: number) {
@@ -175,6 +190,39 @@ export class Game extends Scene {
       })
     }
   }
+
+  setAntialias(enabled: boolean) {
+    const renderer = this.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer
+    const gl = renderer.gl
+    const glFilter = enabled ? gl.LINEAR : gl.NEAREST
+    // scaleMode 0 = LINEAR, 1 = NEAREST — must update so Phaser doesn't override on rebind
+    const scaleMode = enabled ? 0 : 1
+    const skip = new Set(['distort', 'background'])
+    let needsRetry = false
+    Object.entries(this.textures.list).forEach(([key, texture]) => {
+      if (skip.has(key)) return
+      texture.source.forEach((source: Phaser.Textures.TextureSource) => {
+        source.scaleMode = scaleMode
+        const glTex = source.glTexture?.webGLTexture
+        if (glTex) {
+          gl.bindTexture(gl.TEXTURE_2D, glTex)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, glFilter)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, glFilter)
+        } else {
+          needsRetry = true
+        }
+      })
+    })
+    // Some textures may not be on the GPU yet — retry next frame until all are updated
+    if (needsRetry) {
+      this.game.events.once(Phaser.Core.Events.POST_RENDER, () =>
+        this.setAntialias(enabled),
+      )
+    }
+    this.cameras.main.setRoundPixels(!enabled)
+    this.game.canvas.style.imageRendering = enabled ? 'auto' : 'pixelated'
+  }
+
 
   private killPlayer() {
     this.gameState = 'dying'
