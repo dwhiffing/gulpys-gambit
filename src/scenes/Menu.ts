@@ -47,15 +47,19 @@ export class Menu extends Scene {
       ease: 'Sine.easeInOut',
     })
 
+    let transitioning = true
+    this.time.delayedCall(1000, () => (transitioning = false))
     const startGame = () => {
+      if (transitioning) return
+      transitioning = true
       this.scene.launch('Checkerboard', {
         nextScene: 'Game',
         stopScene: 'Menu',
       })
     }
 
-    this.input.keyboard!.once('keydown-Z', startGame)
-    this.input.once('pointerdown', startGame)
+    this.input.keyboard!.on('keydown-Z', startGame)
+    this.input.on('pointerdown', startGame)
 
     ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(
       this,

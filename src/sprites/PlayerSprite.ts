@@ -194,13 +194,15 @@ export class PlayerSprite {
     this.body.enable = true
     this.tintOverlay.setVisible(this.sprite.visible)
 
-    if (this.swipeDir !== -1) {
-      this.nextDir = this.swipeDir
-      this.swipeDir = -1
-    } else if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
-    else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
-    else if (cursors.up.isDown) this.nextDir = DIRS.UP
-    else if (cursors.down.isDown) this.nextDir = DIRS.DOWN
+    if (!this.spinning) {
+      if (this.swipeDir !== -1) {
+        this.nextDir = this.swipeDir
+        this.swipeDir = -1
+      } else if (cursors.right.isDown) this.nextDir = DIRS.RIGHT
+      else if (cursors.left.isDown) this.nextDir = DIRS.LEFT
+      else if (cursors.up.isDown) this.nextDir = DIRS.UP
+      else if (cursors.down.isDown) this.nextDir = DIRS.DOWN
+    }
 
     if (this.waitingForInput) {
       const anyDown =

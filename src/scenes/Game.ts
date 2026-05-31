@@ -29,8 +29,13 @@ export class Game extends Scene {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.gameState = 'playing'
 
-    const level = data?.level ?? 6
-    this.maze = new Maze(this, getMazeConfig(level))
+    const level = data?.level ?? 1
+    try {
+      this.maze = new Maze(this, getMazeConfig(level))
+    } catch {
+      this.scene.restart({ level })
+      return
+    }
 
     const mazeW = this.maze.cols * CELL
     const mazeH = this.maze.rows * CELL

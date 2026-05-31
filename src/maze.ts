@@ -639,6 +639,7 @@ function generateMaze(config: MazeConfig): GenerateResult {
       (a.x - cx) ** 2 + (a.y - cy) ** 2 - ((b.x - cx) ** 2 + (b.y - cy) ** 2),
   )
   const playerSpawn = deadEnds[0]
+  if (!playerSpawn) throw new Error('No player spawn point found')
   for (let dy = 0; dy < 2; dy++)
     for (let dx = 0; dx < 2; dx++)
       grid[playerSpawn.y + dy][playerSpawn.x + dx] = TILES.EMPTY
