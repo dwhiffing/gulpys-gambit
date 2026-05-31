@@ -269,7 +269,7 @@ export class Game extends Scene {
           })
         : this.scene.launch('Checkerboard', {
             restartScene: 'Game',
-            restartData: { level: this.level },
+            restartData: { level: this.level, timeLeft: this.timeLeft },
           }),
     )
   }
