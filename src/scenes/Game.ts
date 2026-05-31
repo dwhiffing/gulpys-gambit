@@ -76,12 +76,10 @@ export class Game extends Scene {
           this.maze.hideAllGlows()
           this.gameState = 'won'
           for (const g of this.ghosts) g.stop()
-          this.time.delayedCall(1000, () =>
-            this.scene.launch('Checkerboard', {
-              restartScene: 'Game',
-              restartData: { level: level + 1, timeLeft: this.timeLeft },
-            }),
-          )
+          this.scene.launch('Checkerboard', {
+            restartScene: 'Game',
+            restartData: { level: level + 1, timeLeft: this.timeLeft },
+          })
         }
       },
     )
