@@ -5,5 +5,5 @@ export default defineConfig({
   build: {
     rollupOptions: { output: { manualChunks: { phaser: ['phaser'] } } },
   },
-  server: { port: 8080 },
+  server: { port: 8080, host: true },
 })
