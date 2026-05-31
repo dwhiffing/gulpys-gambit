@@ -193,6 +193,7 @@ export class PlayerSprite {
     if (this.wrap.tick(delta, this)) return false
     this.body.enable = true
     this.tintOverlay.setVisible(this.sprite.visible)
+    this.glowSprite.setVisible(this.sprite.visible && !this.stunned)
 
     if (!this.spinning) {
       if (this.swipeDir !== -1) {
@@ -305,6 +306,7 @@ export class PlayerSprite {
         this.wrap.trigger()
         this.sprite.setVisible(false)
         this.tintOverlay.setVisible(false)
+        this.glowSprite.setVisible(false)
         this.body.enable = false
         this.updatePosition()
         return true
