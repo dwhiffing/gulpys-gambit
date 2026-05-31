@@ -3,6 +3,7 @@ import { AUTO, Game } from 'phaser'
 import { Boot as BootScene } from './scenes/Boot'
 import { Fade as FadeScene } from './scenes/Fade'
 import { Game as GameScene } from './scenes/Game'
+import { HUD as HUDScene } from './scenes/HUD'
 import { Menu as MenuScene } from './scenes/Menu'
 
 export const NATIVE_W = 550
@@ -24,5 +25,5 @@ new Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, MenuScene, GameScene, FadeScene],
+  scene: [BootScene, MenuScene, GameScene, HUDScene, FadeScene],
 })

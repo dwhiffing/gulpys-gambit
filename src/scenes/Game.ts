@@ -1,7 +1,7 @@
 import type { Types } from 'phaser'
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, TIMESCALE } from '../constants'
+import { CELL, TIMER_BASE, TIMER_MAX, TIMER_PER_DOT, TIMESCALE } from '../constants'
 import { Maze } from '../maze'
 import { getMazeConfig } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
@@ -19,17 +19,21 @@ export class Game extends Scene {
   private bgDisplacement!: Phaser.Filters.Displacement
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
   private stunTimer: Phaser.Time.TimerEvent | null = null
+  timeLeft = TIMER_BASE
+  private level = 1
   gameScale = 1
 
   constructor() {
     super('Game')
   }
 
-  create(data?: { level?: number }) {
+  create(data?: { level?: number; timeLeft?: number }) {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.gameState = 'playing'
+    this.timeLeft = data?.timeLeft ?? TIMER_BASE
 
-    const level = data?.level ?? 1
+    this.level = data?.level ?? 1
+    const level = this.level
     try {
       this.maze = new Maze(this, getMazeConfig(level))
     } catch {
@@ -66,6 +70,7 @@ export class Game extends Scene {
         const d = dot as Phaser.Physics.Arcade.Sprite
         d.disableBody(true, true)
         this.player.collectDot()
+        this.timeLeft = Math.min(TIMER_MAX, this.timeLeft + TIMER_PER_DOT)
 
         if (this.maze.dotGroup.countActive() === 0) {
           this.maze.hideAllGlows()
@@ -74,7 +79,7 @@ export class Game extends Scene {
           this.time.delayedCall(1000, () =>
             this.scene.launch('Checkerboard', {
               restartScene: 'Game',
-              restartData: { level: level + 1 },
+              restartData: { level: level + 1, timeLeft: this.timeLeft },
             }),
           )
         }
@@ -113,6 +118,8 @@ export class Game extends Scene {
         return true
       },
     )
+    this.scene.launch('HUD')
+
     this.tweens.timeScale = TIMESCALE
     this.anims.globalTimeScale = TIMESCALE
     const antialias = !Number.isInteger(this.gameScale)
@@ -156,6 +163,13 @@ export class Game extends Scene {
     if (this.gameState !== 'playing') return
 
     updateScrollingBg(this.bg, this.bgDisplacement, _time)
+
+    this.timeLeft -= (delta / 1000) * TIMESCALE
+    if (this.timeLeft <= 0) {
+      this.timeLeft = 0
+      this.killPlayer(true)
+      return
+    }
 
     this.maze.updateGlow(_time)
     const scaledDelta = delta * TIMESCALE
@@ -243,15 +257,20 @@ export class Game extends Scene {
     this.stunTimer = this.time.delayedCall(1500, () => this.player.unstun())
   }
 
-  private killPlayer() {
+  private killPlayer(timeout = false) {
     this.gameState = 'dying'
     this.player.die()
     for (const g of this.ghosts) g.stop()
     this.time.delayedCall(1000, () =>
-      this.scene.launch('Checkerboard', {
-        stopScene: 'Game',
-        nextScene: 'Menu',
-      }),
+      timeout
+        ? this.scene.launch('Checkerboard', {
+            stopScene: 'Game',
+            nextScene: 'Menu',
+          })
+        : this.scene.launch('Checkerboard', {
+            restartScene: 'Game',
+            restartData: { level: this.level },
+          }),
     )
   }
 }
