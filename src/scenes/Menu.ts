@@ -1,28 +1,145 @@
-import { GameObjects, Scene } from 'phaser'
+import * as Phaser from 'phaser'
+import { Scene } from 'phaser'
+import { CELL, LETTER_BITMAPS, TILES } from '../constants'
 import { NATIVE_H, NATIVE_W } from '../main'
+import { buildWallMask, wallFrame } from '../maze'
+import { createScrollingBg, updateScrollingBg } from '../utils'
+
+const LETTER_H = 5
+const LETTER_GAP = 1 // gap between letters
+
+interface GlowEntry {
+  img: Phaser.GameObjects.Image
+  phase: number
+}
 
 export class Menu extends Scene {
-  title: GameObjects.Text
+  private bg!: Phaser.GameObjects.TileSprite
+  private bgDisplacement!: Phaser.Filters.Displacement
+  private glowSprites: GlowEntry[] = []
 
   constructor() {
     super('Menu')
   }
 
   create() {
-    this.title = this.add
-      .text(NATIVE_W / 2, NATIVE_H / 2, "Gulpy's Gambit", {
-        fontFamily: 'Arial Black',
-        fontSize: 38,
-        color: '#7294d6',
-        align: 'center',
-      })
-      .setOrigin(0.5)
+    this.glowSprites = []
+    this.createLetterMaze()
 
-    this.input.keyboard!.once('keydown', () => {
+    this.input.keyboard!.once('keydown-Z', () => {
       this.scene.launch('Checkerboard', {
         nextScene: 'Game',
         stopScene: 'Menu',
       })
     })
+
+    ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(
+      this,
+      NATIVE_W,
+      NATIVE_H,
+    ))
+  }
+
+  private createLetterMaze() {
+    const cols = 35
+    const rows = 43
+
+    // Start all WALL
+    const grid: number[][] = Array.from({ length: rows }, () =>
+      Array(cols).fill(TILES.WALL),
+    )
+
+    // Place a word into the grid at (startX, startY) by carving letter pixels as POWER
+    const placeWord = (word: string, startX: number, startY: number) => {
+      let ox = startX
+      for (const ch of word) {
+        const bitmap = LETTER_BITMAPS[ch]
+        if (!bitmap) continue
+        const w = bitmap[0].length
+        for (let dy = 0; dy < LETTER_H; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            if (bitmap[dy][dx]) {
+              const gx = ox + dx
+              const gy = startY + dy
+              if (gx > 0 && gx < cols - 1 && gy > 0 && gy < rows - 1) {
+                grid[gy][gx] = TILES.POWER
+              }
+            }
+          }
+        }
+        ox += w + LETTER_GAP
+      }
+    }
+
+    const line1 = 'GULPYS'
+    const line2 = 'GAMBIT'
+    const lineGap = 3
+    const totalH = LETTER_H * 2 + lineGap
+    const startY1 = Math.floor((rows - totalH) / 2) - 7
+    const startY2 = startY1 + LETTER_H + lineGap
+
+    const startX1 = Math.floor((cols - wordWidth(line1)) / 2)
+    const startX2 = Math.floor((cols - wordWidth(line2)) / 2)
+
+    const placeLine = (y: number) => {
+      for (let x = 0; x < cols; x++) {
+        if (y > 0 && y < rows - 1) {
+          grid[y][x] = TILES.EMPTY
+        }
+      }
+    }
+
+    placeLine(startY1 - 4)
+    placeWord(line1, startX1, startY1)
+    placeWord(line2, startX2, startY2)
+    placeLine(startY2 + LETTER_H + 3)
+
+    // Render wall sprites using the same bitmask logic as the game maze
+    const isWall = (tx: number, ty: number) =>
+      tx < 0 ||
+      tx >= cols ||
+      ty < 0 ||
+      ty >= rows ||
+      grid[ty][tx] === TILES.WALL
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (grid[y][x] === TILES.EMPTY || grid[y][x] === TILES.POWER) {
+          const power = grid[y][x] === TILES.POWER
+          const px = x * CELL + CELL / 2
+          const py = y * CELL + CELL / 2
+          this.add
+            .sprite(px, py, 'dots', power ? 3 : 2)
+            .setDepth(1)
+            .setAlpha(1)
+          const img = this.add
+            .image(px, py, power ? 'power-glow' : 'dot-glow')
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setDepth(0)
+          this.glowSprites.push({ img, phase: (px + py) / CELL })
+        }
+        if (grid[y][x] !== TILES.WALL) continue
+        const px = x * CELL + CELL / 2
+        const py = y * CELL + CELL / 2
+        const frame = wallFrame(buildWallMask(isWall, x, y))
+        this.add.sprite(px, py, 'tiles', frame)
+      }
+    }
+  }
+
+  update(_time: number) {
+    const speed = 0.003
+    for (const { img, phase } of this.glowSprites) {
+      const t = Math.cos(_time * speed - phase) * 0.5 + 0.5
+      img.setAlpha(0.05 + t * t * 0.85)
+    }
+
+    updateScrollingBg(this.bg, this.bgDisplacement, _time)
   }
 }
+
+const wordWidth = (word: string) =>
+  word.split('').reduce((acc, ch, i) => {
+    const w = LETTER_BITMAPS[ch]?.[0].length ?? 0
+    return acc + w + (i < word.length - 1 ? LETTER_GAP : 0)
+  }, 0)

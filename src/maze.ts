@@ -51,27 +51,8 @@ export class Maze {
     this.playerSpawn = result.playerSpawn
     this.walls = []
     this.dotGroup = this.scene.physics.add.staticGroup()
-    this.createGlowTextures(scene)
     this.glowContainer = scene.add.container(0, 0).setDepth(1)
     this.createSprites()
-  }
-
-  private createGlowTextures(scene: Phaser.Scene) {
-    for (const [key, radius, color] of [
-      ['dot-glow', CELL * 0.6, 0xaa7711],
-      ['power-glow', CELL * 1, 0xff8800],
-    ] as [string, number, number][]) {
-      if (scene.textures.exists(key)) continue
-      const size = Math.ceil(radius * 2)
-      const g = scene.make.graphics({ x: 0, y: 0 }, false)
-      const steps = 20
-      for (let i = steps; i >= 1; i--) {
-        const r = (i / steps) * radius
-        const a = (1 - i / steps) * 0.2
-        g.fillStyle(color, a).fillCircle(size / 2, size / 2, r)
-      }
-      g.generateTexture(key, size, size).destroy()
-    }
   }
 
   addDotGlow(dot: Phaser.Physics.Arcade.Sprite, power: boolean) {
@@ -113,8 +94,6 @@ export class Maze {
       ty >= this.rows ||
       this.grid[ty][tx] === TILES.WALL ||
       this.grid[ty][tx] === TILES.DOOR
-    const isOob = (tx: number, ty: number) =>
-      tx < 0 || tx >= this.cols || ty < 0 || ty >= this.rows
 
     for (let y = 0; y < this.rows; y++) {
       for (let x = 0; x < this.cols; x++) {
@@ -123,28 +102,11 @@ export class Maze {
           const px = x * CELL + CELL / 2
           const py = y * CELL + CELL / 2
           let frame: number
+          let mask: number = -1
           if (t === TILES.DOOR) {
             frame = 1
           } else {
-            // 8-bit bitmask: bits 0-3 = N/E/S/W cardinals, bits 4-7 = NE/SE/SW/NW diagonals.
-            // Diagonals are zeroed when either adjacent cardinal is open (they are irrelevant then).
-            const n = isWall(x, y - 1)
-            const e = isWall(x + 1, y)
-            const s = isWall(x, y + 1)
-            const w = isWall(x - 1, y)
-            const ne = n && e && !isOob(x + 1, y - 1)
-            const se = s && e && !isOob(x + 1, y + 1)
-            const sw = s && w && !isOob(x - 1, y + 1)
-            const nw = n && w && !isOob(x - 1, y - 1)
-            const mask =
-              (n ? 1 : 0) |
-              (e ? 2 : 0) |
-              (s ? 4 : 0) |
-              (w ? 8 : 0) |
-              (ne ? 16 : 0) |
-              (se ? 32 : 0) |
-              (sw ? 64 : 0) |
-              (nw ? 128 : 0)
+            mask = buildWallMask(isWall, x, y)
             frame = wallFrame(mask)
           }
           this.walls.push(this.scene.add.sprite(px, py, 'tiles', frame))
@@ -280,6 +242,29 @@ export class Maze {
   }
 }
 
+export { wallFrame }
+
+export function buildWallMask(
+  isWall: (tx: number, ty: number) => boolean,
+  x: number,
+  y: number,
+): number {
+  const n = isWall(x, y - 1)
+  const e = isWall(x + 1, y)
+  const s = isWall(x, y + 1)
+  const w = isWall(x - 1, y)
+  return (
+    (n ? 1 : 0) |
+    (e ? 2 : 0) |
+    (s ? 4 : 0) |
+    (w ? 8 : 0) |
+    (isWall(x + 1, y - 1) ? 16 : 0) |
+    (isWall(x + 1, y + 1) ? 32 : 0) |
+    (isWall(x - 1, y + 1) ? 64 : 0) |
+    (isWall(x - 1, y - 1) ? 128 : 0)
+  )
+}
+
 // Maps an 8-bit wall mask to a tile frame index.
 // Bits 0-3: cardinals N(1) E(2) S(4) W(8).
 // Bits 4-7: diagonals NE(16) SE(32) SW(64) NW(128) — only set when the diagonal is in-bounds (OOB = open inner corner).
@@ -301,11 +286,12 @@ export class Maze {
 //   cardinals=9  (N+W): NW-open→45
 //   cardinals=12 (S+W): SW-open→46
 function wallFrame(mask: number): number {
+  if (mask < 16) return mask
   const cardinals = mask & 0xf
-  const ne = (mask >> 4) & 1 // 1 = diagonal wall present (corner filled), 0 = open inner corner
-  const se = (mask >> 5) & 1
-  const sw = (mask >> 6) & 1
-  const nw = (mask >> 7) & 1
+  const ne = !((mask >> 4) & 1) // 1 = diagonal wall present (corner filled), 0 = open inner corner
+  const se = !((mask >> 5) & 1)
+  const sw = !((mask >> 6) & 1)
+  const nw = !((mask >> 7) & 1)
 
   switch (cardinals) {
     case 3: // N+E — potential inner corner: NE

@@ -37,21 +37,24 @@ export interface MazeConfig {
   powerCount: number
 }
 
-const S = 24
-export const MAZE_CONFIG: MazeConfig = {
-  cols: S,
-  rows: Math.floor(S * 1.25),
-  symmetry: 'none',
-  loopFactor: 0.2,
-  wraps: { x: 2, y: 1 },
-  ghosts: {
-    oct: 0,
-    teeth2: 0,
-    naut: 1,
-    angler1: 0,
-    roach: 0,
-  },
-  powerCount: 0,
+const MIN_SIZE = 16
+const MAX_SIZE = 35
+export const getMazeConfig = (level: number): MazeConfig => {
+  const S = Math.min(MAX_SIZE, Math.max(MIN_SIZE, 16 + (level - 1) * 2))
+  const wraps = Math.floor(S / 15)
+  return {
+    cols: S,
+    rows: Math.floor(S * 1.25),
+    symmetry: 'none',
+    loopFactor: 0.2,
+    wraps: { x: wraps, y: wraps - 1 },
+    ghosts: {
+      teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
+      naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
+      oct: level <= 7 ? 0 : 1,
+    },
+    powerCount: 0,
+  }
 }
 
 export const GHOST_COLORS: [number, number, number][] = [

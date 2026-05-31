@@ -6,6 +6,7 @@ interface FadeData {
   nextSceneData?: object
   stopScene?: string // scene to stop once screen is covered
   restartScene?: string // scene to restart once screen is covered
+  restartData?: object
 }
 
 const CELL = 40 // px per tile
@@ -54,7 +55,7 @@ export class Fade extends Scene {
 
     this.time.delayedCall(launchAt, () => {
       if (data.stopScene) this.scene.stop(data.stopScene)
-      if (data.restartScene) this.scene.get(data.restartScene)?.scene.restart()
+      if (data.restartScene) this.scene.get(data.restartScene)?.scene.restart(data.restartData)
       else if (data.nextScene)
         this.scene.launch(data.nextScene, data.nextSceneData ?? {})
     })

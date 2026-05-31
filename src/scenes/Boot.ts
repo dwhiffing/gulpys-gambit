@@ -44,10 +44,28 @@ export class Boot extends Scene {
 
   create() {
     this.createAnimations()
+    this.createGlowTextures()
     this.scene.launch('Checkerboard', {
       nextScene: 'Menu',
       stopScene: 'Boot',
     })
+  }
+
+  private createGlowTextures() {
+    for (const [key, radius, color] of [
+      ['dot-glow', CELL * 0.6, 0xaa7711],
+      ['power-glow', CELL * 0.9, 0xdd8800],
+    ] as [string, number, number][]) {
+      const size = Math.ceil(radius * 2)
+      const g = this.make.graphics({ x: 0, y: 0 }, false)
+      const steps = 20
+      for (let i = steps; i >= 1; i--) {
+        const r = (i / steps) * radius
+        const a = (1 - i / steps) * 0.2
+        g.fillStyle(color, a).fillCircle(size / 2, size / 2, r)
+      }
+      g.generateTexture(key, size, size).destroy()
+    }
   }
 
   private createAnimations() {

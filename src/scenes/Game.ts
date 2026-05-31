@@ -3,10 +3,10 @@ import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
 import { CELL, TIMESCALE } from '../constants'
 import { Maze } from '../maze'
-import { MAZE_CONFIG } from '../mazeConfig'
+import { getMazeConfig } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
 import { PlayerSprite } from '../sprites/PlayerSprite'
-import { calcZoom, wobble } from '../utils'
+import { createScrollingBg, updateScrollingBg } from '../utils'
 
 export class Game extends Scene {
   maze!: Maze
@@ -23,21 +23,15 @@ export class Game extends Scene {
     super('Game')
   }
 
-  create() {
+  create(data?: { level?: number }) {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.gameState = 'playing'
 
-    this.input.keyboard!.once('keydown-N', () => {
-      MAZE_CONFIG.cols += 1
-      MAZE_CONFIG.rows += 1
-      this.scene.restart()
-    })
-
-    this.maze = new Maze(this, MAZE_CONFIG)
+    const level = data?.level ?? 1
+    this.maze = new Maze(this, getMazeConfig(level))
 
     const mazeW = this.maze.cols * CELL
     const mazeH = this.maze.rows * CELL
-    this.scale.setZoom(calcZoom(mazeW, mazeH))
 
     this.createBackground(mazeW, mazeH)
 
@@ -66,7 +60,10 @@ export class Game extends Scene {
           this.gameState = 'won'
           for (const g of this.ghosts) g.stop()
           this.time.delayedCall(1000, () =>
-            this.scene.launch('Checkerboard', { restartScene: 'Game' }),
+            this.scene.launch('Checkerboard', {
+              restartScene: 'Game',
+              restartData: { level: level + 1 },
+            }),
           )
         }
       },
@@ -80,7 +77,7 @@ export class Game extends Scene {
         ;(mine as Phaser.Physics.Arcade.Sprite)
           .disableBody(true, true)
           .setVisible(false)
-        this.killPlayer()
+        this.stunPlayer()
       },
       () => this.gameState === 'playing',
     )
@@ -124,26 +121,13 @@ export class Game extends Scene {
       addBorder(0, offsetY + mazeH, width, offsetY + 1)
     }
 
-    this.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
-    this.bg = this.add
-      .tileSprite(0, 0, mazeW, mazeH, 'background')
-      .setOrigin(0)
-      .setAlpha(0.2)
-      .setDepth(-1)
-
-    this.bgDisplacement = this.bg
-      .enableFilters()
-      .filters!.internal.addDisplacement('distort')
+    ;({ bg: this.bg, bgDisplacement: this.bgDisplacement } = createScrollingBg(this, mazeW, mazeH))
   }
 
   update(_time: number, delta: number) {
     if (this.gameState !== 'playing') return
 
-    const t = _time * 0.00004
-    this.bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 220)
-    this.bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 220)
-    this.bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.1)
-    this.bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
+    updateScrollingBg(this.bg, this.bgDisplacement, _time)
 
     this.maze.updateGlow(_time)
     const scaledDelta = delta * TIMESCALE

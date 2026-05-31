@@ -1,3 +1,4 @@
+import * as Phaser from 'phaser'
 import { CELL, DX, DY, TILES, WRAP_DELAY } from './constants'
 
 export function wrapX(x: number, cols: number): number {
@@ -145,33 +146,29 @@ export function wobble(
   )
 }
 
-export const buildZoomSteps = (
-  min: number,
-  max: number,
-  intermediateSteps: number,
-) => {
-  const minExp = Math.log2(min)
-  const maxExp = Math.log2(max)
-  const powers: number[] = []
-  for (let e = minExp; e <= maxExp; e++) {
-    powers.push(2 ** e)
-  }
-  if (intermediateSteps === 0) return powers
-  const result: number[] = []
-  for (let i = 0; i < powers.length - 1; i++) {
-    result.push(powers[i])
-    for (let j = 1; j <= intermediateSteps; j++) {
-      result.push(powers[i] * 2 ** (j / (intermediateSteps + 1)))
-    }
-  }
-  result.push(powers[powers.length - 1])
-  return result
+export function createScrollingBg(
+  scene: Phaser.Scene,
+  w: number,
+  h: number,
+): { bg: Phaser.GameObjects.TileSprite; bgDisplacement: Phaser.Filters.Displacement } {
+  scene.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
+  const bg = scene.add
+    .tileSprite(0, 0, w, h, 'background')
+    .setOrigin(0)
+    .setAlpha(0.2)
+    .setDepth(-1)
+  const bgDisplacement = bg.enableFilters().filters!.internal.addDisplacement('distort')
+  return { bg, bgDisplacement }
 }
 
-const ZOOM_STEPS = buildZoomSteps(1, 4, 1)
-export const calcZoom = (w: number, h: number) => {
-  const raw = Math.min(window.innerWidth / w, window.innerHeight / h)
-  // return raw
-  const filtered = ZOOM_STEPS.filter((z) => z <= raw)
-  return filtered.length ? filtered[filtered.length - 1] : ZOOM_STEPS[0]
+export function updateScrollingBg(
+  bg: Phaser.GameObjects.TileSprite,
+  bgDisplacement: Phaser.Filters.Displacement,
+  time: number,
+): void {
+  const t = time * 0.00004
+  bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 220)
+  bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 220)
+  bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.1)
+  bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
 }
