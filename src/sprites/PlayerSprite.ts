@@ -7,7 +7,7 @@ import {
   DASH_DISTANCE,
   DIRS,
   DOT_EFFECT_INTERVAL,
-  GLOW_ENABLED,
+  EFFECTS_ENABLED,
   DX,
   DY,
   FLIP_DURATION,
@@ -189,7 +189,7 @@ export class PlayerSprite {
     this.spinning = false
     this.sprite.setAngle(0).setFlipX(false).play('player-die')
     this.glowSprite.setVisible(false)
-    this.tintOverlay.setVisible(false)
+    this.tintOverlay?.setVisible(false)
     dieSound(this.audioCtx)
   }
 
@@ -211,7 +211,7 @@ export class PlayerSprite {
     this.boostAmount = 0
     this.boostSustainTimer = 0
     this.glowSprite.setVisible(false)
-    this.tintOverlay.setAlpha(0)
+    this.tintOverlay?.setAlpha(0)
     this.sprite.setAlpha(0.5).stop()
     this.scene.tweens.add({
       targets: this.sprite,
@@ -247,15 +247,17 @@ export class PlayerSprite {
         : DOT_EFFECT_INTERVAL / this.speedRatio ** 2
       this.processDotEat()
     } else if (this.dotQueue === 0 && this.dotQueueTimer === 0) {
-      this.scene.tweens.add({
-        targets: this.tintOverlay,
-        alpha: 0,
-        duration: 300,
-        ease: 'Sine.easeOut',
-      })
+      if (this.tintOverlay) {
+        this.scene.tweens.add({
+          targets: this.tintOverlay,
+          alpha: 0,
+          duration: 300,
+          ease: 'Sine.easeOut',
+        })
+      }
     }
     this.body.enable = true
-    this.tintOverlay.setVisible(this.sprite.visible)
+    this.tintOverlay?.setVisible(this.sprite.visible)
     this.glowSprite.setVisible(this.sprite.visible && !this.stunned)
 
     if (!this.spinning) {
@@ -474,7 +476,7 @@ export class PlayerSprite {
   }
 
   private updateGlow() {
-    if (!GLOW_ENABLED) return
+    if (!EFFECTS_ENABLED) return
     const target = this.speedRatio >= 1.8 ? 1.5 : 0.5
     if (target !== this.glowTarget) {
       this.glowTarget = target
@@ -529,7 +531,7 @@ export class PlayerSprite {
       const count = this.speedRatio >= 2 ? 2 : 1
       const interval =
         this.speedRatio >= 2 ? 50 : this.speedRatio >= 1.5 ? 100 : 500
-      this.swimTrail.emitParticleAt(tailX, tailY, count)
+      this.swimTrail?.emitParticleAt(tailX, tailY, count)
       this.swimTrailTimer = interval
     }
     this.glowSprite
@@ -538,7 +540,7 @@ export class PlayerSprite {
       .setFlip(this.sprite.flipX, this.sprite.flipY)
       .setFrame(this.sprite.frame.name)
     this.tintOverlay
-      .setPosition(this.x, this.y)
+      ?.setPosition(this.x, this.y)
       .setAngle(this.sprite.angle)
       .setFlip(this.sprite.flipX, this.sprite.flipY)
       .setFrame(this.sprite.frame.name)
@@ -697,40 +699,47 @@ export class PlayerSprite {
     this.glowSprite = this.scene.add
       .sprite(this.x, this.y, 'player', 0)
       .setDepth(6)
-      .setVisible(GLOW_ENABLED)
+      .setVisible(EFFECTS_ENABLED)
     this.glow = this.glowSprite
       .enableFilters()
       .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)
     this.glow.outerStrength = 0.5
-    this.tintOverlay = this.scene.add
-      .sprite(this.x, this.y, 'player', 0)
-      .setDepth(8)
-      .setTint(0xff7700)
-      .setTintMode(Phaser.TintModes.FILL)
-      .setAlpha(0)
+    if (EFFECTS_ENABLED) {
+      this.tintOverlay = this.scene.add
+        .sprite(this.x, this.y, 'player', 0)
+        .setDepth(8)
+        .setTint(0xff7700)
+        .setTintMode(Phaser.TintModes.FILL)
+        .setAlpha(0)
+    }
 
-    this.dotParticles = this.scene.add
-      .particles(0, 0, 'dots', {
-        frame: 2,
-        scale: { start: 0.7, end: 0 },
-        lifespan: { min: 300, max: 600 },
-        emitting: false,
-      })
-      .setDepth(-1)
+    if (EFFECTS_ENABLED) {
+      this.dotParticles = this.scene.add
+        .particles(0, 0, 'dots', {
+          frame: 2,
+          scale: { start: 0.7, end: 0 },
+          lifespan: { min: 300, max: 600 },
+          emitting: false,
+        })
+        .setDepth(-1)
 
-    this.swimTrail = this.scene.add
-      .particles(0, 0, 'dots', BUBBLE_EMITTER_CONFIG)
-      .setDepth(1)
+      this.swimTrail = this.scene.add
+        .particles(0, 0, 'dots', BUBBLE_EMITTER_CONFIG)
+        .setDepth(1)
+    }
   }
 
   private processDotEat() {
     this.playEatSound()
     this.fireEatParticles()
-    this.scene.tweens.killTweensOf(this.tintOverlay)
-    this.tintOverlay.setAlpha(0.5)
+    if (this.tintOverlay) {
+      this.scene.tweens.killTweensOf(this.tintOverlay)
+      this.tintOverlay.setAlpha(0.5)
+    }
   }
 
   private fireEatParticles() {
+    if (!this.dotParticles) return
     const { x, y } = this.mouthPosition
     const count = Math.max(
       1,

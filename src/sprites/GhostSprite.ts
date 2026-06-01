@@ -71,9 +71,11 @@ export class GhostSprite {
       })
     this.sprite.body!.setCircle(C.CELL * 0.6, C.CELL * 0.4, C.CELL * 0.4)
 
-    this.swimTrail = scene.add
-      .particles(0, 0, 'dots', C.BUBBLE_EMITTER_CONFIG)
-      .setDepth(1)
+    if (C.EFFECTS_ENABLED) {
+      this.swimTrail = scene.add
+        .particles(0, 0, 'dots', C.BUBBLE_EMITTER_CONFIG)
+        .setDepth(1)
+    }
 
     if (DEBUG_GHOST_TARGETS) {
       this.debugLine = scene.add.graphics().setDepth(1)
@@ -420,8 +422,32 @@ export class GhostSprite {
     if (this.swimTrailTimer > 0) return
     const tailX = this.sprite.x - C.DX[this.dir] * C.CELL * 0.7
     const tailY = this.sprite.y - C.DY[this.dir] * C.CELL * 0.7
-    this.swimTrail.emitParticleAt(tailX, tailY, 1)
+    this.swimTrail?.emitParticleAt(tailX, tailY, 1)
     this.swimTrailTimer = ENEMY_TYPES[this.enemyType].swimTrailInterval ?? 200
+  }
+
+  /** Shared BFS buffers — allocated once per ghost, reused every call */
+  private bfsVisited: Uint8Array | null = null
+  private bfsGeneration = 0
+  private bfsQueueX!: Int16Array
+  private bfsQueueY!: Int16Array
+  private bfsQueueDir!: Int16Array
+
+  private ensureBfsBuffers() {
+    const size = this.cols * this.rows
+    if (!this.bfsVisited || this.bfsVisited.length < size) {
+      this.bfsVisited = new Uint8Array(size)
+      this.bfsQueueX = new Int16Array(size)
+      this.bfsQueueY = new Int16Array(size)
+      this.bfsQueueDir = new Int16Array(size)
+      this.bfsGeneration = 0
+    }
+    // Increment generation instead of clearing the array
+    this.bfsGeneration++
+    if (this.bfsGeneration > 254) {
+      this.bfsVisited.fill(0)
+      this.bfsGeneration = 1
+    }
   }
 
   private chooseDir(
@@ -435,35 +461,48 @@ export class GhostSprite {
     const target = this.getTarget(playerTileX, playerTileY, playerDir)
     const canReverse = ENEMY_TYPES[this.enemyType].canReverse ?? false
 
-    // BFS — guarantees shortest path and no cycles
-    type Node = { x: number; y: number; firstDir: number }
-    const visited = new Set<string>()
-    const queue: Node[] = []
+    this.ensureBfsBuffers()
+    const visited = this.bfsVisited!
+    const gen = this.bfsGeneration
+    const qx = this.bfsQueueX
+    const qy = this.bfsQueueY
+    const qd = this.bfsQueueDir
+    const cols = this.cols
+    let tail = 0
 
     for (let dir = 0; dir < 4; dir++) {
       if (!canReverse && dir === OPPOSITE[fromDir]) continue
       if (!canMove(this.grid, fromTileX, fromTileY, dir, false)) continue
-      const nx = wrapX(fromTileX + C.DX[dir], this.cols)
+      const nx = wrapX(fromTileX + C.DX[dir], cols)
       const ny = wrapY(fromTileY + C.DY[dir], this.rows)
-      const key = `${nx},${ny}`
-      if (!visited.has(key)) {
-        visited.add(key)
-        queue.push({ x: nx, y: ny, firstDir: dir })
+      const idx = ny * cols + nx
+      if (visited[idx] !== gen) {
+        visited[idx] = gen
+        qx[tail] = nx
+        qy[tail] = ny
+        qd[tail] = dir
+        tail++
       }
     }
 
     let head = 0
-    while (head < queue.length) {
-      const { x, y, firstDir } = queue[head++]
+    while (head < tail) {
+      const x = qx[head]
+      const y = qy[head]
+      const firstDir = qd[head]
+      head++
       if (x === target.x && y === target.y) return firstDir
       for (let dir = 0; dir < 4; dir++) {
         if (!canMove(this.grid, x, y, dir, false)) continue
-        const nx = wrapX(x + C.DX[dir], this.cols)
+        const nx = wrapX(x + C.DX[dir], cols)
         const ny = wrapY(y + C.DY[dir], this.rows)
-        const key = `${nx},${ny}`
-        if (!visited.has(key)) {
-          visited.add(key)
-          queue.push({ x: nx, y: ny, firstDir })
+        const idx = ny * cols + nx
+        if (visited[idx] !== gen) {
+          visited[idx] = gen
+          qx[tail] = nx
+          qy[tail] = ny
+          qd[tail] = firstDir
+          tail++
         }
       }
     }
@@ -589,57 +628,74 @@ export class GhostSprite {
     playerDir: number,
   ): TilePos[] {
     const target = this.getTarget(playerTileX, playerTileY, playerDir)
-    // BFS — reconstruct the full tile path to target
-    type Node = { x: number; y: number; parent: Node | null }
-    const visited = new Map<string, Node>()
-    const queue: Node[] = []
-    const startKey = `${fromTileX},${fromTileY}`
-    const startNode: Node = { x: fromTileX, y: fromTileY, parent: null }
-    visited.set(startKey, startNode)
+    const cols = this.cols
+    const rows = this.rows
+
+    this.ensureBfsBuffers()
+    const visited = this.bfsVisited!
+    const gen = this.bfsGeneration
+    const qx = this.bfsQueueX
+    const qy = this.bfsQueueY
+    // Reuse bfsQueueDir as parent-index tracker
+    const parent = this.bfsQueueDir
+    let tail = 0
+
+    const startIdx = fromTileY * cols + fromTileX
+    visited[startIdx] = gen
+    qx[tail] = fromTileX
+    qy[tail] = fromTileY
+    parent[tail] = -1
+    tail++
 
     // Seed only from current direction (ghost can't reverse mid-tile)
     for (let dir = 0; dir < 4; dir++) {
       if (dir === OPPOSITE[this.dir]) continue
       if (!canMove(this.grid, fromTileX, fromTileY, dir, false)) continue
-      const nx = wrapX(fromTileX + C.DX[dir], this.cols)
-      const ny = wrapY(fromTileY + C.DY[dir], this.rows)
-      const key = `${nx},${ny}`
-      if (!visited.has(key)) {
-        const node: Node = { x: nx, y: ny, parent: startNode }
-        visited.set(key, node)
-        queue.push(node)
+      const nx = wrapX(fromTileX + C.DX[dir], cols)
+      const ny = wrapY(fromTileY + C.DY[dir], rows)
+      const idx = ny * cols + nx
+      if (visited[idx] !== gen) {
+        visited[idx] = gen
+        qx[tail] = nx
+        qy[tail] = ny
+        parent[tail] = 0 // parent is start node at index 0
+        tail++
       }
     }
 
-    let found: Node | null = null
+    let foundIdx = -1
     let head = 0
-    while (head < queue.length) {
-      const node = queue[head++]
-      if (node.x === target.x && node.y === target.y) {
-        found = node
+    while (head < tail) {
+      const x = qx[head]
+      const y = qy[head]
+      if (x === target.x && y === target.y) {
+        foundIdx = head
         break
       }
       for (let dir = 0; dir < 4; dir++) {
-        if (!canMove(this.grid, node.x, node.y, dir, false)) continue
-        const nx = wrapX(node.x + C.DX[dir], this.cols)
-        const ny = wrapY(node.y + C.DY[dir], this.rows)
-        const key = `${nx},${ny}`
-        if (!visited.has(key)) {
-          const next: Node = { x: nx, y: ny, parent: node }
-          visited.set(key, next)
-          queue.push(next)
+        if (!canMove(this.grid, x, y, dir, false)) continue
+        const nx = wrapX(x + C.DX[dir], cols)
+        const ny = wrapY(y + C.DY[dir], rows)
+        const idx = ny * cols + nx
+        if (visited[idx] !== gen) {
+          visited[idx] = gen
+          qx[tail] = nx
+          qy[tail] = ny
+          parent[tail] = head
+          tail++
         }
       }
+      head++
     }
 
-    if (!found) return [{ x: fromTileX, y: fromTileY }]
+    if (foundIdx === -1) return [{ x: fromTileX, y: fromTileY }]
 
     // Walk parent chain to build path
     const reversed: TilePos[] = []
-    let cur: Node | null = found
-    while (cur) {
-      reversed.push({ x: cur.x, y: cur.y })
-      cur = cur.parent
+    let cur = foundIdx
+    while (cur >= 0) {
+      reversed.push({ x: qx[cur], y: qy[cur] })
+      cur = parent[cur]
     }
     return reversed.reverse()
   }

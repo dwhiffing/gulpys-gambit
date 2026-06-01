@@ -16,7 +16,7 @@ export class Game extends Scene {
   mineGroup!: Phaser.Physics.Arcade.StaticGroup
   private cursors!: Types.Input.Keyboard.CursorKeys
   private bg!: Phaser.GameObjects.TileSprite
-  private bgDisplacement!: Phaser.Filters.Displacement
+  private bgDisplacement!: Phaser.Filters.Displacement | null
   private gameState: 'playing' | 'dying' | 'won' = 'playing'
   private stunTimer: Phaser.Time.TimerEvent | null = null
   timeLeft = TIMER_BASE

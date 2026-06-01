@@ -37,7 +37,8 @@ export const TIMER_PER_DOT = 0.2 // seconds gained per dot eaten
 
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
 export const DOT_EFFECT_INTERVAL = 170 // ms between dot flash/particle/glow effects
-export const GLOW_ENABLED = true // set to false to disable dot and player glow effects
+export const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+export const EFFECTS_ENABLED = !IS_MOBILE
 
 export const GHOST_SPEED = 2.5
 

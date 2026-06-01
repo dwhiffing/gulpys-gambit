@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser'
-import { CELL, DX, DY, TILES, WRAP_DELAY } from './constants'
+import { CELL, DX, DY, EFFECTS_ENABLED, TILES, WRAP_DELAY } from './constants'
 
 export function wrapX(x: number, cols: number): number {
   if (x < 0) return cols - 1
@@ -153,7 +153,7 @@ export function createScrollingBg(
   alpha = 0.2,
 ): {
   bg: Phaser.GameObjects.TileSprite
-  bgDisplacement: Phaser.Filters.Displacement
+  bgDisplacement: Phaser.Filters.Displacement | null
 } {
   scene.textures.get('background').setFilter(Phaser.Textures.FilterMode.LINEAR)
   const bg = scene.add
@@ -161,6 +161,7 @@ export function createScrollingBg(
     .setOrigin(0)
     .setAlpha(alpha)
     .setDepth(-1)
+  if (!EFFECTS_ENABLED) return { bg, bgDisplacement: null }
   const bgDisplacement = bg
     .enableFilters()
     .filters!.internal.addDisplacement('distort')
@@ -169,12 +170,14 @@ export function createScrollingBg(
 
 export function updateScrollingBg(
   bg: Phaser.GameObjects.TileSprite,
-  bgDisplacement: Phaser.Filters.Displacement,
+  bgDisplacement: Phaser.Filters.Displacement | null,
   time: number,
 ): void {
   const t = time * 0.00004
   bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 220)
   bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 220)
-  bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.15)
-  bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.15)
+  if (bgDisplacement) {
+    bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.15)
+    bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.15)
+  }
 }

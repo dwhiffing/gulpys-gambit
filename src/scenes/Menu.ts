@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, LETTER_BITMAPS, TILES } from '../constants'
+import { CELL, EFFECTS_ENABLED, LETTER_BITMAPS, TILES } from '../constants'
 import { NATIVE_H, NATIVE_W } from '../main'
 import { buildWallMask, wallFrame } from '../maze'
 import { powerDotSound } from '../sounds'
@@ -16,7 +16,7 @@ interface GlowEntry {
 
 export class Menu extends Scene {
   private bg!: Phaser.GameObjects.TileSprite
-  private bgDisplacement!: Phaser.Filters.Displacement
+  private bgDisplacement!: Phaser.Filters.Displacement | null
   private glowSprites: GlowEntry[] = []
 
   constructor() {
@@ -162,11 +162,13 @@ export class Menu extends Scene {
           const px = x * CELL + CELL / 2
           const py = y * CELL + CELL / 2
           this.add.sprite(px, py, 'dots', 3).setDepth(1).setAlpha(1)
-          const img = this.add
-            .image(px, py, 'power-glow')
-            .setBlendMode(Phaser.BlendModes.ADD)
-            .setDepth(0)
-          this.glowSprites.push({ img, phase: (px + py) / CELL / 7 })
+          if (EFFECTS_ENABLED) {
+            const img = this.add
+              .image(px, py, 'power-glow')
+              .setBlendMode(Phaser.BlendModes.ADD)
+              .setDepth(0)
+            this.glowSprites.push({ img, phase: (px + py) / CELL / 7 })
+          }
         }
         if (grid[y][x] !== TILES.WALL) continue
         const px = x * CELL + CELL / 2
