@@ -82,7 +82,7 @@ export class PlayerSprite {
     const py = this.tileY * CELL + CELL
     this.x = px
     this.y = py
-    this.sprite = scene.physics.add.sprite(px, py, 'player', 0).setDepth(2)
+    this.sprite = scene.physics.add.sprite(px, py, 'player', 0).setDepth(7)
     this.audioCtx = new AudioContext()
     this.createEatEffects()
 
@@ -406,7 +406,7 @@ export class PlayerSprite {
   }
 
   private updateGlow() {
-    const target = this.speedRatio >= 1.9 ? 1.5 : 0.5
+    const target = this.speedRatio >= 1.8 ? 1.5 : 0.5
     if (target !== this.glowTarget) {
       this.glowTarget = target
       this.scene.tweens.killTweensOf(this.glow)
@@ -466,7 +466,10 @@ export class PlayerSprite {
       this.spinTimer = FLIP_DURATION / this.speedRatio
       this.applyDir(dir)
       this.sprite.play('player-flip')
-      this.boostAmount = 0
+      this.boostAmount = Math.max(
+        0,
+        this.boostAmount - PLAYER_SPEED * BOOST_DEC,
+      )
       this.boostSustainTimer = 0
       return
     }
