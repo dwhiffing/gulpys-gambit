@@ -330,7 +330,7 @@ export class Game extends Scene {
     this.player.die()
     for (const g of this.ghosts) g.stop()
     this.time.delayedCall(1000, () => {
-      if (timeout || this.timeLeft - 15 <= 0) {
+      if (timeout || this.timeLeft - 8 <= 0) {
         this.scene.launch('Checkerboard', {
           stopScene: 'Game',
           nextScene: 'Menu',
@@ -341,7 +341,7 @@ export class Game extends Scene {
           restartScene: 'Game',
           restartData: {
             level: this.level,
-            timeLeft: this.timeLeft - 15,
+            timeLeft: this.timeLeft - 8,
             eatenDots: this.eatenDots,
             runSeed: this.runSeed,
           },
