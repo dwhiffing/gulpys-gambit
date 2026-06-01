@@ -37,7 +37,12 @@ export class Game extends Scene {
     super('Game')
   }
 
-  create(data?: { level?: number; timeLeft?: number; eatenDots?: string[]; runSeed?: number }) {
+  create(data?: {
+    level?: number
+    timeLeft?: number
+    eatenDots?: string[]
+    runSeed?: number
+  }) {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.input.keyboard!.on('keydown-N', () => {
       if (!DEBUG_SKIP_LEVEL) return
@@ -66,7 +71,10 @@ export class Game extends Scene {
     config.seed = this.runSeed + level * 2654435761
     for (let attempt = 0; ; attempt++) {
       try {
-        this.maze = new Maze(this, { ...config, seed: config.seed + attempt * 997 })
+        this.maze = new Maze(this, {
+          ...config,
+          seed: config.seed + attempt * 997,
+        })
         break
       } catch {
         if (attempt > 50) throw new Error('Failed to generate maze')
@@ -78,8 +86,11 @@ export class Game extends Scene {
     const { width, height } = this.scale.gameSize
     this.gameScale = Math.min(width / (mazeW + CELL), height / (mazeH + CELL))
     if (this.gameScale > 2) this.gameScale = 2
-    else if (this.gameScale < 1.5) this.gameScale = 1
-    else this.gameScale = 1.5
+    else if (this.gameScale < 1.35) this.gameScale = 1
+    else {
+      // Round to nearest 0.25 to improve blurry-edges consistency between integer and non-integer scales
+      this.gameScale = Math.round(this.gameScale * 4) / 4
+    }
 
     // Remove previously eaten dots on restart
     const eatenSet = new Set(this.eatenDots)
@@ -132,7 +143,11 @@ export class Game extends Scene {
           for (const g of this.ghosts) g.stop()
           this.scene.launch('Checkerboard', {
             restartScene: 'Game',
-            restartData: { level: level + 1, timeLeft: this.timeLeft, runSeed: this.runSeed },
+            restartData: {
+              level: level + 1,
+              timeLeft: this.timeLeft,
+              runSeed: this.runSeed,
+            },
           })
         }
       },
