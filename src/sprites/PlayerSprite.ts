@@ -15,7 +15,16 @@ import {
   SPIN_DURATION,
 } from '../constants'
 import type { Game } from '../scenes/Game'
-import { eatSound, turnSound } from '../sounds'
+import {
+  beatLevelSound,
+  dashSound,
+  dieSound,
+  eatSound,
+  powerDotSound,
+  timeOutSound,
+  turnSound,
+  wrapSound,
+} from '../sounds'
 import {
   canMove,
   isWrapping,
@@ -85,15 +94,13 @@ export class PlayerSprite {
     this.y = py
     this.sprite = scene.physics.add.sprite(px, py, 'player', 0).setDepth(7)
     this.audioCtx = new AudioContext()
+    window.setSfxMuted = (muted: boolean) => {
+      if (muted) this.audioCtx.suspend()
+      else this.audioCtx.resume()
+    }
     this.createEatEffects()
 
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
-    scene.input
-      .keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M)
-      .on('down', () => {
-        this.muted = !this.muted
-        localStorage.setItem('muted', String(this.muted))
-      })
 
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.touchStartX = p.x
@@ -140,6 +147,15 @@ export class PlayerSprite {
     this.sprite.setAngle(0).setFlipX(false).play('player-die')
     this.glowSprite.setVisible(false)
     this.tintOverlay.setVisible(false)
+    dieSound(this.audioCtx)
+  }
+
+  playBeatLevelSound() {
+    beatLevelSound(this.audioCtx)
+  }
+
+  playTimeOutSound() {
+    timeOutSound(this.audioCtx)
   }
 
   stun() {
@@ -244,7 +260,7 @@ export class PlayerSprite {
         this.moving = true
         this.dashDistanceLeft = DASH_DISTANCE
         this.addBoost()
-        if (!this.muted) turnSound(this.audioCtx, true, 3)
+        dashSound(this.audioCtx)
       }
     }
     if (!this.moving) {
@@ -306,6 +322,7 @@ export class PlayerSprite {
       if (this.wrapping && !this.wrap.active && this.progress >= 2) {
         this.progress = 2
         this.wrap.trigger()
+        wrapSound(this.audioCtx)
         this.sprite.setVisible(false)
         this.tintOverlay.setVisible(false)
         this.glowSprite.setVisible(false)
@@ -461,8 +478,7 @@ export class PlayerSprite {
   }
 
   private playTurnSound(isFlip: boolean) {
-    if (this.muted) return
-    turnSound(this.audioCtx, isFlip, isFlip ? 5 : 3)
+    turnSound(this.audioCtx, isFlip)
   }
 
   private turnTo(dir: number) {
@@ -596,7 +612,6 @@ export class PlayerSprite {
   }
 
   private playEatSound() {
-    if (this.muted) return
     const jitter = 1 + (Math.random() - 0.5) * 0.08
     const freq =
       (this.eatToggle === 0 ? 320 : 220) *
@@ -607,4 +622,3 @@ export class PlayerSprite {
     eatSound(this.audioCtx, freq * 1.2, freq * 0.2, 0.1, 0.06)
   }
 }
-

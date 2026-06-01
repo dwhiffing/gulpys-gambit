@@ -48,38 +48,10 @@ export class Boot extends Scene {
     this.createGlowTextures()
     this.createNoiseTexture()
 
-    const MUTE_KEY = 'gulpy-mute'
-    const states = ['all', 'sfx', 'mute'] as const
-    type MuteState = (typeof states)[number]
-
-    const saved = localStorage.getItem(MUTE_KEY) as MuteState | null
-    let stateIndex = Math.max(0, states.indexOf(saved as MuteState))
-
-    const soundManager = this.sound
-    const music = soundManager.add('music', { loop: true })
-
-    const applyState = (state: MuteState) => {
-      if (state === 'all') {
-        soundManager.mute = false
-        music.setMute(false)
-      } else if (state === 'sfx') {
-        soundManager.mute = false
-        music.setMute(true)
-      } else {
-        soundManager.mute = true
-      }
-    }
-
-    applyState(states[stateIndex])
-    music.play({ volume: 0.05 })
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() !== 'm') return
-      stateIndex = (stateIndex + 1) % states.length
-      const state = states[stateIndex]
-      localStorage.setItem(MUTE_KEY, state)
-      applyState(state)
-    })
+    window.music = this.sound.add('music', {
+      loop: true,
+    }) as Phaser.Sound.WebAudioSound
+    window.music.play({ volume: 0.05 })
 
     // this.scene.start('Game')
     this.scene.launch('Checkerboard', {

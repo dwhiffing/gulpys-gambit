@@ -75,6 +75,7 @@ export class Game extends Scene {
         if (this.maze.dotGroup.countActive() === 0) {
           this.maze.hideAllGlows()
           this.gameState = 'won'
+          this.player.playBeatLevelSound()
           for (const g of this.ghosts) g.stop()
           this.scene.launch('Checkerboard', {
             restartScene: 'Game',
@@ -257,6 +258,7 @@ export class Game extends Scene {
 
   private killPlayer(timeout = false) {
     this.gameState = 'dying'
+    if (timeout) this.player.playTimeOutSound()
     this.player.die()
     for (const g of this.ghosts) g.stop()
     this.time.delayedCall(1000, () =>

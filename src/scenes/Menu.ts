@@ -3,6 +3,7 @@ import { Scene } from 'phaser'
 import { CELL, LETTER_BITMAPS, TILES } from '../constants'
 import { NATIVE_H, NATIVE_W } from '../main'
 import { buildWallMask, wallFrame } from '../maze'
+import { powerDotSound } from '../sounds'
 import { createScrollingBg, updateScrollingBg } from '../utils'
 
 const LETTER_H = 5
@@ -52,6 +53,7 @@ export class Menu extends Scene {
     const startGame = () => {
       if (transitioning) return
       transitioning = true
+      powerDotSound(new AudioContext())
       this.scene.launch('Checkerboard', {
         nextScene: 'Game',
         stopScene: 'Menu',
