@@ -72,6 +72,7 @@ export class Menu extends Scene {
       this.scene.launch('Checkerboard', {
         nextScene: 'Game',
         stopScene: 'Menu',
+        nextSceneData: { runSeed: Math.floor(Math.random() * 2147483647) },
       })
     }
 

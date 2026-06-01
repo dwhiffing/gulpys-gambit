@@ -629,7 +629,7 @@ export class PlayerSprite {
       this.sprite.play('player-flip')
       this.boostAmount = Math.max(
         0,
-        this.boostAmount - PLAYER_SPEED * BOOST_DEC,
+        this.boostAmount - PLAYER_SPEED * BOOST_DEC * 0.5,
       )
       this.boostSustainTimer = 0
       return

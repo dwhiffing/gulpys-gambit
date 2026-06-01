@@ -35,6 +35,8 @@ export interface MazeConfig {
   ghosts: Partial<Record<EnemyType, number>>
   /** Number of power pellets to place. Spread evenly around the maze perimeter. */
   powerCount: number
+  /** RNG seed for deterministic maze generation. */
+  seed: number
 }
 
 const MIN_SIZE = 15
@@ -54,10 +56,11 @@ export const getMazeConfig = (level: number): MazeConfig => {
     wraps: { x: wraps, y: wraps - 1 },
     ghosts: {
       teeth2: level <= 3 ? 1 : level <= 5 ? 2 : level <= 9 ? 2 : 3,
-      naut: level <= 7 ? 0 : level <= 13 ? 1 : 2,
-      oct: level <= 11 ? 0 : 1,
+      naut: level <= 6 ? 0 : level <= 12 ? 1 : 2,
+      oct: level <= 10 ? 0 : 1,
     },
-    powerCount: 4 + level,
+    powerCount: 4 + level + (level > 6 ? 2 : 0),
+    seed: level,
   }
 }
 

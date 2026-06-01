@@ -350,9 +350,20 @@ function wallFrame(mask: number): number {
   return cardinals
 }
 
-function shuffle<T>(arr: T[]): T[] {
+/** Simple mulberry32 seeded PRNG returning 0–1 */
+function createRng(seed: number): () => number {
+  let s = seed | 0
+  return () => {
+    s = (s + 0x6d2b79f5) | 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function shuffle<T>(arr: T[], rng: () => number): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr
@@ -368,6 +379,7 @@ interface GenerateResult {
 
 function generateMaze(config: MazeConfig): GenerateResult {
   const { symmetry, loopFactor, wraps } = config
+  const rng = createRng(config.seed)
 
   // Stride-3 mapping for 2-tile-wide passages:
   //   Cell (lc,lr) → 2×2 block at [lc*3+1..lc*3+2, lr*3+1..lr*3+2]
@@ -413,7 +425,7 @@ function generateMaze(config: MazeConfig): GenerateResult {
       for (let dx = 0; dx < 2; dx++)
         grid[lr * 3 + 1 + dy][lc * 3 + 1 + dx] = TILES.EMPTY
 
-    for (const dir of shuffle([0, 1, 2, 3])) {
+    for (const dir of shuffle([0, 1, 2, 3], rng)) {
       const nc = lc + DX[dir]
       const nr = lr + DY[dir]
       if (nc < 0 || nc >= LCOLS || nr < 0 || nr >= LROWS) continue
@@ -434,11 +446,11 @@ function generateMaze(config: MazeConfig): GenerateResult {
   // ── Add loops ────────────────────────────────────────────────────────────
   for (let lr = 0; lr < LROWS; lr++) {
     for (let lc = 0; lc < LCOLS; lc++) {
-      if (lc < LCOLS - 1 && Math.random() < loopFactor) {
+      if (lc < LCOLS - 1 && rng() < loopFactor) {
         const wx = lc * 3 + 3
         for (let dy = 0; dy < 2; dy++) grid[lr * 3 + 1 + dy][wx] = TILES.EMPTY
       }
-      if (lr < LROWS - 1 && Math.random() < loopFactor) {
+      if (lr < LROWS - 1 && rng() < loopFactor) {
         const wy = lr * 3 + 3
         for (let dx = 0; dx < 2; dx++) grid[wy][lc * 3 + 1 + dx] = TILES.EMPTY
       }
@@ -493,7 +505,7 @@ function generateMaze(config: MazeConfig): GenerateResult {
       passable(cols - 3, ty + 1)
     if (leftOk && rightOk) xCandidates.push(lr)
   }
-  shuffle(xCandidates)
+  shuffle(xCandidates, rng)
   for (const lr of xCandidates.slice(0, wraps.x)) {
     const ty = lr * 3 + 1
     grid[ty][0] = TILES.EMPTY
@@ -519,7 +531,7 @@ function generateMaze(config: MazeConfig): GenerateResult {
       passable(tx + 1, rows - 3)
     if (topOk && bottomOk) yCandidates.push(lc)
   }
-  shuffle(yCandidates)
+  shuffle(yCandidates, rng)
   for (const lc of yCandidates.slice(0, wraps.y)) {
     const tx = lc * 3 + 1
     grid[0][tx] = TILES.EMPTY
@@ -579,6 +591,17 @@ function generateMaze(config: MazeConfig): GenerateResult {
       }
     }
   }
+
+  // ── Sort wrap spawns so tunnels furthest from player are preferred ───────
+  // Player spawn is near center, so sort by distance from center descending
+  const centerX = cols / 2
+  const centerY = rows / 2
+  wrapSpawns.sort(
+    (a, b) =>
+      (b.x - centerX) ** 2 +
+      (b.y - centerY) ** 2 -
+      ((a.x - centerX) ** 2 + (a.y - centerY) ** 2),
+  )
 
   // ── Assign ghost spawners from wrap tiles ────────────────────────────────
   const ghostEntries: EnemyType[] = Object.entries(config.ghosts).flatMap(

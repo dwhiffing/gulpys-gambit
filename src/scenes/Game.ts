@@ -29,13 +29,15 @@ export class Game extends Scene {
   private stunTimer: Phaser.Time.TimerEvent | null = null
   timeLeft = TIMER_BASE
   private level = 1
+  private eatenDots: string[] = []
+  private runSeed = 0
   gameScale = 1
 
   constructor() {
     super('Game')
   }
 
-  create(data?: { level?: number; timeLeft?: number }) {
+  create(data?: { level?: number; timeLeft?: number; eatenDots?: string[]; runSeed?: number }) {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.input.keyboard!.on('keydown-N', () => {
       if (!DEBUG_SKIP_LEVEL) return
@@ -49,19 +51,26 @@ export class Game extends Scene {
         restartData: {
           level: this.level + 1,
           timeLeft: Math.min(TIMER_MAX, this.timeLeft + 15),
+          runSeed: this.runSeed,
         },
       })
     })
     this.gameState = 'playing'
     this.timeLeft = data?.timeLeft ?? TIMER_BASE
+    this.eatenDots = data?.eatenDots ?? []
+    this.runSeed = data?.runSeed ?? Math.floor(Math.random() * 2147483647)
 
     this.level = data?.level ?? 1
     const level = this.level
-    try {
-      this.maze = new Maze(this, getMazeConfig(level))
-    } catch {
-      this.scene.restart({ level })
-      return
+    const config = getMazeConfig(level)
+    config.seed = this.runSeed + level * 2654435761
+    for (let attempt = 0; ; attempt++) {
+      try {
+        this.maze = new Maze(this, { ...config, seed: config.seed + attempt * 997 })
+        break
+      } catch {
+        if (attempt > 50) throw new Error('Failed to generate maze')
+      }
     }
 
     const mazeW = this.maze.cols * CELL
@@ -71,6 +80,16 @@ export class Game extends Scene {
     if (this.gameScale > 2) this.gameScale = 2
     else if (this.gameScale < 1.5) this.gameScale = 1
     else this.gameScale = 1.5
+
+    // Remove previously eaten dots on restart
+    const eatenSet = new Set(this.eatenDots)
+    if (eatenSet.size > 0) {
+      for (const dot of this.maze.dotGroup.getChildren() as Phaser.Physics.Arcade.Sprite[]) {
+        if (eatenSet.has(`${dot.x},${dot.y}`)) {
+          dot.disableBody(true, true)
+        }
+      }
+    }
 
     this.createBackground(mazeW, mazeH)
 
@@ -91,6 +110,7 @@ export class Game extends Scene {
       this.maze.dotGroup,
       (_player, dot) => {
         const d = dot as Phaser.Physics.Arcade.Sprite
+        this.eatenDots.push(`${d.x},${d.y}`)
         d.disableBody(true, true)
         if (Number(d.frame.name) === TILES.POWER) {
           this.player.collectPowerDot(d.x, d.y)
@@ -112,7 +132,7 @@ export class Game extends Scene {
           for (const g of this.ghosts) g.stop()
           this.scene.launch('Checkerboard', {
             restartScene: 'Game',
-            restartData: { level: level + 1, timeLeft: this.timeLeft },
+            restartData: { level: level + 1, timeLeft: this.timeLeft, runSeed: this.runSeed },
           })
         }
       },
@@ -304,7 +324,12 @@ export class Game extends Scene {
       } else {
         this.scene.launch('Checkerboard', {
           restartScene: 'Game',
-          restartData: { level: this.level, timeLeft: this.timeLeft - 15 },
+          restartData: {
+            level: this.level,
+            timeLeft: this.timeLeft - 15,
+            eatenDots: this.eatenDots,
+            runSeed: this.runSeed,
+          },
         })
       }
     })
