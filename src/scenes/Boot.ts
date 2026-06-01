@@ -71,7 +71,7 @@ export class Boot extends Scene {
     }
 
     applyState(states[stateIndex])
-    music.play()
+    music.play({ volume: 0.05 })
 
     window.addEventListener('keydown', (e) => {
       if (e.key.toLowerCase() !== 'm') return

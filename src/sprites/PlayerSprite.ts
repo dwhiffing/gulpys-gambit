@@ -15,6 +15,7 @@ import {
   SPIN_DURATION,
 } from '../constants'
 import type { Game } from '../scenes/Game'
+import { eatSound, turnSound } from '../sounds'
 import {
   canMove,
   isWrapping,
@@ -243,6 +244,7 @@ export class PlayerSprite {
         this.moving = true
         this.dashDistanceLeft = DASH_DISTANCE
         this.addBoost()
+        if (!this.muted) turnSound(this.audioCtx, true, 3)
       }
     }
     if (!this.moving) {
@@ -458,11 +460,17 @@ export class PlayerSprite {
     return (a ^ b) === 1
   }
 
+  private playTurnSound(isFlip: boolean) {
+    if (this.muted) return
+    turnSound(this.audioCtx, isFlip, isFlip ? 5 : 3)
+  }
+
   private turnTo(dir: number) {
     const oldDir = this.dir
     this.dir = dir
     this.spinning = true
     if (this.isFlip(oldDir, dir)) {
+      this.playTurnSound(true)
       this.spinTimer = FLIP_DURATION / this.speedRatio
       this.applyDir(dir)
       this.sprite.play('player-flip')
@@ -473,6 +481,7 @@ export class PlayerSprite {
       this.boostSustainTimer = 0
       return
     }
+    this.playTurnSound(false)
     this.sprite
       .setAngle(0)
       .setFlip(oldDir === 1 || dir === 1, oldDir === 3 || dir === 3)
@@ -599,25 +608,3 @@ export class PlayerSprite {
   }
 }
 
-const eatSound = (
-  ac: AudioContext,
-  startFreq: number,
-  endFreq: number,
-  dur: number,
-  vol: number,
-) => {
-  const osc = ac.createOscillator()
-  const gain = ac.createGain()
-  const now = ac.currentTime
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(startFreq, now)
-  osc.frequency.exponentialRampToValueAtTime(endFreq, now + dur)
-  osc.connect(gain)
-  gain.gain.setValueAtTime(0, now)
-  gain.gain.linearRampToValueAtTime(vol, now + 0.012)
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-  gain.gain.setValueAtTime(0, now + dur + 0.002)
-  osc.start(now)
-  osc.stop(now + dur + 0.003)
-  gain.connect(ac.destination)
-}
