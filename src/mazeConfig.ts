@@ -37,24 +37,25 @@ export interface MazeConfig {
   powerCount: number
 }
 
-const MIN_SIZE = 16
+const MIN_SIZE = 15
 const MAX_SIZE = 35
 export const getMazeConfig = (level: number): MazeConfig => {
   const S = Math.min(
     MAX_SIZE,
-    Math.max(MIN_SIZE, Math.floor(16 + (level - 2) * 1.5)),
+    Math.max(MIN_SIZE, Math.floor(15 + (level - 2) * 1.75)),
   )
   const wraps = Math.floor(S / 15)
   return {
     cols: S,
-    rows: Math.floor(S * 1.25),
+    rows:
+      level <= 1 ? S : level <= 2 ? Math.floor(S * 1.15) : Math.floor(S * 1.25),
     symmetry: 'none',
     loopFactor: 0.2,
     wraps: { x: wraps, y: wraps - 1 },
     ghosts: {
-      teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
-      naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
-      oct: level <= 7 ? 0 : 1,
+      teeth2: level <= 3 ? 1 : level <= 5 ? 2 : level <= 9 ? 2 : 3,
+      naut: level <= 7 ? 0 : level <= 13 ? 1 : 2,
+      oct: level <= 11 ? 0 : 1,
     },
     powerCount: 4 + level,
   }
