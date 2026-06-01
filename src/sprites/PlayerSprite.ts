@@ -400,9 +400,10 @@ export class PlayerSprite {
             this.turnTo(this.nextDir)
           }
         } else if (
-          !this.dashing &&
           !canMove(this.grid, this.tileX, this.tileY, this.dir, false)
         ) {
+          this.dashing = false
+          this.dashDistanceLeft = 0
           this.moving = false
           this.progress = 0
           this.sprite.stop()
