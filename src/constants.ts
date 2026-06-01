@@ -32,8 +32,8 @@ export const DX = [1, -1, 0, 0]
 export const DY = [0, 0, -1, 1]
 
 export const TIMER_BASE = 30 // starting seconds and base-layer max for the HUD bar
-export const TIMER_MAX = 60 // absolute max seconds (bonus layer ceiling)
-export const TIMER_PER_DOT = 0.2 // seconds gained per dot eaten
+export const TIMER_MAX = 90 // absolute max seconds (bonus layer ceiling)
+export const TIMER_PER_DOT = 0.185 // seconds gained per dot eaten
 
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
 export const DOT_EFFECT_INTERVAL = 170 // ms between dot flash/particle/glow effects

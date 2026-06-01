@@ -79,6 +79,12 @@ export class Game extends Scene {
         if (this.maze.dotGroup.countActive() === 0) {
           this.maze.hideAllGlows()
           this.gameState = 'won'
+          // Bonus time for unprocessed dots still in the eat trail
+          this.timeLeft = Math.min(
+            TIMER_MAX,
+            this.timeLeft + this.player.dotQueue * 2,
+          )
+          this.player.dotQueue = 0
           this.player.playBeatLevelSound()
           for (const g of this.ghosts) g.stop()
           this.scene.launch('Checkerboard', {
@@ -266,7 +272,7 @@ export class Game extends Scene {
     this.player.die()
     for (const g of this.ghosts) g.stop()
     this.time.delayedCall(1000, () => {
-      if (timeout || this.timeLeft - 10 <= 0) {
+      if (timeout || this.timeLeft - 15 <= 0) {
         this.scene.launch('Checkerboard', {
           stopScene: 'Game',
           nextScene: 'Menu',
@@ -275,7 +281,7 @@ export class Game extends Scene {
       } else {
         this.scene.launch('Checkerboard', {
           restartScene: 'Game',
-          restartData: { level: this.level, timeLeft: this.timeLeft - 10 },
+          restartData: { level: this.level, timeLeft: this.timeLeft - 15 },
         })
       }
     })

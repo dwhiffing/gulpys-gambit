@@ -73,7 +73,7 @@ export class PlayerSprite {
   private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
   private audioCtx!: AudioContext
   private eatToggle = 0
-  private dotQueue = 0
+  dotQueue = 0
   private dotQueueTimer = 0
   private stunned = false
   pendingStun = false
