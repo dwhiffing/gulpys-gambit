@@ -49,11 +49,11 @@ export const getMazeConfig = (level: number): MazeConfig => {
     loopFactor: 0.2,
     wraps: { x: wraps, y: wraps - 1 },
     ghosts: {
-      teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
-      naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
-      oct: level <= 7 ? 0 : 1,
+      // teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
+      // naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
+      // oct: level <= 7 ? 0 : 1,
     },
-    powerCount: 0,
+    powerCount: 10 + level,
   }
 }
 

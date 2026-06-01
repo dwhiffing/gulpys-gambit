@@ -10,7 +10,7 @@ export const MAX_PLAYER_SPEED = 8
 // how far through a tile (0–1) before a queued perpendicular turn snaps early
 export const SPIN_DURATION = 240
 export const FLIP_DURATION = 120
-export const DASH_COOLDOWN = 1000 // ms between dashes
+export const DASH_COOLDOWN = 100 // ms between dashes
 export const DASH_DISTANCE = 2 // tiles
 
 export const DIRS = {
@@ -37,15 +37,16 @@ export const TIMER_PER_DOT = 0.2 // seconds gained per dot eaten
 
 export const WRAP_DELAY = 300 // ms sprite is hidden while crossing a wrap edge
 export const DOT_EFFECT_INTERVAL = 170 // ms between dot flash/particle/glow effects
+export const GLOW_ENABLED = true // set to false to disable dot and player glow effects
 
 export const GHOST_SPEED = 2.5
 
 export const BUBBLE_EMITTER_CONFIG = {
   frame: 1,
   scale: { start: 0.5, end: 1.5 },
-  alpha: { start: 0.4, end: 0 },
+  alpha: { start: 0.65, end: 0 },
   lifespan: { min: 300, max: 2500 },
-  speed: { min: 2, max: 9 },
+  speed: { min: 4, max: 12 },
   emitting: false,
 }
 
@@ -128,11 +129,5 @@ export const LETTER_BITMAPS: Record<string, number[][]> = {
     [0, 0, 1, 0, 0],
     [0, 0, 1, 0, 0],
   ],
-  "'": [
-    [1],
-    [1],
-    [0],
-    [0],
-    [0],
-  ],
+  "'": [[1], [1], [0], [0], [0]],
 }

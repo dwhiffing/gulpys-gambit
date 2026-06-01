@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser'
-import { CELL, DX, DY, TILES } from './constants'
+import { CELL, DX, DY, GLOW_ENABLED, TILES } from './constants'
 import type { MazeConfig } from './mazeConfig'
 
 export interface TilePos {
@@ -56,6 +56,7 @@ export class Maze {
   }
 
   addDotGlow(dot: Phaser.Physics.Arcade.Sprite, power: boolean) {
+    if (!GLOW_ENABLED) return
     const key = power ? 'power-glow' : 'dot-glow'
     const img = this.scene.add
       .image(dot.x, dot.y, key)

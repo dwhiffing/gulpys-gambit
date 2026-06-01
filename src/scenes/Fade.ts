@@ -10,8 +10,8 @@ interface FadeData {
 }
 
 const CELL = 40 // px per tile
-const STAGGER = 30 // ms delay per step of wave
-const DURATION = 300 // ms for each tile to fill in — longer = wider gradient band
+const STAGGER = 25 // ms delay per step of wave
+const DURATION = 150 // ms for each tile to fill in — longer = wider gradient band
 
 export class Fade extends Scene {
   constructor() {
@@ -55,7 +55,8 @@ export class Fade extends Scene {
 
     this.time.delayedCall(launchAt, () => {
       if (data.stopScene) this.scene.stop(data.stopScene)
-      if (data.restartScene) this.scene.get(data.restartScene)?.scene.restart(data.restartData)
+      if (data.restartScene)
+        this.scene.get(data.restartScene)?.scene.restart(data.restartData)
       else if (data.nextScene)
         this.scene.launch(data.nextScene, data.nextSceneData ?? {})
     })

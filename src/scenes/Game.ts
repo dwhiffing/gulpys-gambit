@@ -1,7 +1,7 @@
 import type { Types } from 'phaser'
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, TIMER_BASE, TIMER_MAX, TIMER_PER_DOT, TIMESCALE } from '../constants'
+import { CELL, TILES, TIMER_BASE, TIMER_MAX, TIMER_PER_DOT, TIMESCALE } from '../constants'
 import { Maze } from '../maze'
 import { getMazeConfig } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
@@ -69,7 +69,11 @@ export class Game extends Scene {
       (_player, dot) => {
         const d = dot as Phaser.Physics.Arcade.Sprite
         d.disableBody(true, true)
-        this.player.collectDot()
+        if (Number(d.frame.name) === TILES.POWER) {
+          this.player.collectPowerDot(d.x, d.y)
+        } else {
+          this.player.collectDot()
+        }
         this.timeLeft = Math.min(TIMER_MAX, this.timeLeft + TIMER_PER_DOT)
 
         if (this.maze.dotGroup.countActive() === 0) {

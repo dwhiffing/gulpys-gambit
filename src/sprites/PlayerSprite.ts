@@ -7,6 +7,7 @@ import {
   DASH_DISTANCE,
   DIRS,
   DOT_EFFECT_INTERVAL,
+  GLOW_ENABLED,
   DX,
   DY,
   FLIP_DURATION,
@@ -25,14 +26,7 @@ import {
   turnSound,
   wrapSound,
 } from '../sounds'
-import {
-  canMove,
-  isWrapping,
-  moveFrac,
-  WrapHelper,
-  wrapX,
-  wrapY,
-} from '../utils'
+import { canMove, isWrapping, moveFrac, wrapX, wrapY } from '../utils'
 
 const BOOST_SUSTAIN = 1250
 const BOOST_INC = 0.1
@@ -54,9 +48,15 @@ export class PlayerSprite {
   private tintOverlay!: Phaser.GameObjects.Sprite
   spinning = false
   dead = false
+  private dashCharges = 0
   private dashCooldown = 0
   private dashing = false
   private dashDistanceLeft = 0
+  private charges: {
+    sprite: Phaser.GameObjects.Sprite
+    pos: { x: number; y: number }
+  }[] = []
+  private posHistory: { x: number; y: number }[] = []
   private spinTimer = 0
   private cornerX = 0
   private cornerY = 0
@@ -66,12 +66,12 @@ export class PlayerSprite {
   private boostAmount = 0
   private boostSustainTimer = 0
   private swimTrailTimer = 0
-  private wrap = new WrapHelper()
+  private wrapSoundPlayed = false
+  private wrapGhost!: Phaser.GameObjects.Sprite
   private zKey: Phaser.Input.Keyboard.Key
   private dotParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private swimTrail!: Phaser.GameObjects.Particles.ParticleEmitter
   private audioCtx!: AudioContext
-  private muted = localStorage.getItem('muted') === 'true'
   private eatToggle = 0
   private dotQueue = 0
   private dotQueueTimer = 0
@@ -98,7 +98,16 @@ export class PlayerSprite {
       if (muted) this.audioCtx.suspend()
       else this.audioCtx.resume()
     }
+    this.wrapGhost = scene.add
+      .sprite(px, py, 'player', 0)
+      .setDepth(7)
+      .setVisible(false)
     this.createEatEffects()
+    for (let i = 0; i < 2; i++) {
+      this.dashCharges++
+      const sprite = scene.add.sprite(px, py, 'dots', 5).setDepth(4)
+      this.charges.push({ sprite, pos: { x: px, y: py } })
+    }
 
     this.zKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
 
@@ -141,6 +150,40 @@ export class PlayerSprite {
     this.dotQueue++
   }
 
+  collectPowerDot(fromX: number, fromY: number) {
+    this.dotQueue++
+    powerDotSound(this.audioCtx)
+    if (this.dashCharges >= 6) return
+    this.dashCharges++
+    const sprite = this.scene.add.sprite(fromX, fromY, 'dots', 5)
+    sprite.setScale(1).setDepth(4).setAlpha(0)
+    // Initialize in the player's current continuous-space sheet so the
+    // Math.round sheet-alignment in updatePosition never picks the wrong offset.
+    const last = this.posHistory[this.posHistory.length - 1]
+    const pos = last ? { x: last.x, y: last.y } : { x: fromX, y: fromY }
+    this.charges.push({ sprite, pos })
+    this.scene.tweens.add({
+      targets: sprite,
+      alpha: 1,
+      duration: 300,
+      ease: 'Cubic.easeOut',
+    })
+  }
+
+  private popChargeSprite() {
+    const charge = this.charges.pop()
+    if (!charge) return
+    const { sprite } = charge
+    this.scene.tweens.add({
+      targets: sprite,
+      scale: 1.8,
+      alpha: 0,
+      duration: 200,
+      ease: 'Cubic.easeOut',
+      onComplete: () => sprite.destroy(),
+    })
+  }
+
   die() {
     this.dead = true
     this.spinning = false
@@ -148,6 +191,10 @@ export class PlayerSprite {
     this.glowSprite.setVisible(false)
     this.tintOverlay.setVisible(false)
     dieSound(this.audioCtx)
+  }
+
+  playStartSound() {
+    powerDotSound(this.audioCtx)
   }
 
   playBeatLevelSound() {
@@ -207,7 +254,6 @@ export class PlayerSprite {
         ease: 'Sine.easeOut',
       })
     }
-    if (this.wrap.tick(delta, this)) return false
     this.body.enable = true
     this.tintOverlay.setVisible(this.sprite.visible)
     this.glowSprite.setVisible(this.sprite.visible && !this.stunned)
@@ -250,7 +296,12 @@ export class PlayerSprite {
     const dashPressed =
       Phaser.Input.Keyboard.JustDown(this.zKey) || this.swipeDash
     this.swipeDash = false
-    if (dashPressed && !this.dashing && this.dashCooldown === 0) {
+    if (
+      dashPressed &&
+      !this.dashing &&
+      this.dashCharges > 0 &&
+      this.dashCooldown === 0
+    ) {
       const tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
       const tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
       const tileOpen = canMove(this.grid, tileX, tileY, this.dir, false)
@@ -259,6 +310,8 @@ export class PlayerSprite {
         this.dashing = true
         this.moving = true
         this.dashDistanceLeft = DASH_DISTANCE
+        this.dashCharges--
+        this.popChargeSprite()
         this.addBoost()
         dashSound(this.audioCtx)
       }
@@ -319,24 +372,19 @@ export class PlayerSprite {
 
       if (!this.wrapping && this.tryCornering(cursors)) return true
 
-      if (this.wrapping && !this.wrap.active && this.progress >= 2) {
-        this.progress = 2
-        this.wrap.trigger()
+      // While wrapping, play sound at the midpoint and show ghost on entry side
+      if (this.wrapping && !this.wrapSoundPlayed && this.progress >= 1) {
+        this.wrapSoundPlayed = true
         wrapSound(this.audioCtx)
-        this.sprite.setVisible(false)
-        this.tintOverlay.setVisible(false)
-        this.glowSprite.setVisible(false)
-        this.body.enable = false
-        this.updatePosition()
-        return true
       }
 
-      if (
-        (!this.wrapping || this.wrap.active) &&
-        this.progress >= this.wrap.threshold
-      ) {
-        this.progress -= this.wrap.threshold
-        this.wrap.active = false
+      const threshold = this.wrapping ? 2 : 1
+      if (this.progress >= threshold) {
+        this.progress -= threshold
+        if (this.wrapping) {
+          this.wrapSoundPlayed = false
+          this.wrapGhost.setVisible(false)
+        }
         this.tileX = wrapX(this.tileX + DX[this.dir], this.grid[0].length)
         this.tileY = wrapY(this.tileY + DY[this.dir], this.grid.length)
 
@@ -425,6 +473,7 @@ export class PlayerSprite {
   }
 
   private updateGlow() {
+    if (!GLOW_ENABLED) return
     const target = this.speedRatio >= 1.8 ? 1.5 : 0.5
     if (target !== this.glowTarget) {
       this.glowTarget = target
@@ -440,7 +489,7 @@ export class PlayerSprite {
 
   private updatePosition() {
     const { x: fracX, y: fracY } = this.moving
-      ? moveFrac(this, this.progress, this.wrap.active)
+      ? moveFrac(this, this.progress, false)
       : { x: this.tileX, y: this.tileY }
     const arc =
       (1 + Math.cos(this.cornerLerp * Math.PI)) / 2 -
@@ -449,6 +498,28 @@ export class PlayerSprite {
     this.y = fracY * CELL + CELL + this.cornerY * arc
     this.sprite.setPosition(this.x, this.y)
     this.updateBodyCircle()
+
+    // While wrapping, show a ghost sprite on the entry side
+    if (this.wrapping && this.progress > 0) {
+      const cols = this.grid[0].length
+      const rows = this.grid.length
+      const entryX = wrapX(this.tileX + DX[this.dir], cols)
+      const entryY = wrapY(this.tileY + DY[this.dir], rows)
+      // Ghost enters from outside: at progress=0 it's 1 tile off-screen,
+      // at progress=2 it's 1 tile inside
+      const ghostFracX = entryX + DX[this.dir] * (this.progress - 2)
+      const ghostFracY = entryY + DY[this.dir] * (this.progress - 2)
+      const gx = ghostFracX * CELL + CELL
+      const gy = ghostFracY * CELL + CELL
+      this.wrapGhost
+        .setPosition(gx, gy)
+        .setVisible(true)
+        .setAngle(this.sprite.angle)
+        .setFlip(this.sprite.flipX, this.sprite.flipY)
+        .setFrame(this.sprite.frame.name)
+    } else {
+      this.wrapGhost.setVisible(false)
+    }
 
     if (this.moving && this.swimTrailTimer === 0) {
       const { dx, dy } = this.mouthDir
@@ -460,7 +531,6 @@ export class PlayerSprite {
       this.swimTrail.emitParticleAt(tailX, tailY, count)
       this.swimTrailTimer = interval
     }
-    // this.sprite.setAlpha(this.dashCooldown > 0 ? 0.5 : 1)
     this.glowSprite
       .setPosition(this.x, this.y)
       .setAngle(this.sprite.angle)
@@ -471,6 +541,70 @@ export class PlayerSprite {
       .setAngle(this.sprite.angle)
       .setFlip(this.sprite.flipX, this.sprite.flipY)
       .setFrame(this.sprite.frame.name)
+
+    // Store screen-space positions directly. No continuous-space tricks.
+    // When wrapping past the midpoint, use the ghost position (entry side)
+    // so the trail has history on the new side immediately.
+    let hx = this.x
+    let hy = this.y
+    if (this.wrapping && this.progress >= 1) {
+      const cols = this.grid[0].length
+      const rows = this.grid.length
+      const entryX = wrapX(this.tileX + DX[this.dir], cols)
+      const entryY = wrapY(this.tileY + DY[this.dir], rows)
+      const ghostFracX = entryX + DX[this.dir] * (this.progress - 2)
+      const ghostFracY = entryY + DY[this.dir] * (this.progress - 2)
+      hx = ghostFracX * CELL + CELL
+      hy = ghostFracY * CELL + CELL
+    }
+    const last = this.posHistory[this.posHistory.length - 1]
+    if (!last || Math.hypot(hx - last.x, hy - last.y) > 1) {
+      this.posHistory.push({ x: hx, y: hy })
+      const maxLen = (this.charges.length + 3) * 20
+      if (this.posHistory.length > maxLen) {
+        this.posHistory.splice(0, this.posHistory.length - maxLen)
+      }
+    }
+
+    this.updateCharges()
+  }
+
+  private updateCharges() {
+    if (this.charges.length === 0) return
+    const JUMP_THRESHOLD = CELL * 3
+    const spacing = CELL * 0.55
+    let slotIdx = 0
+    let nextTarget = spacing + CELL * 0.6
+    let dist = 0
+    for (
+      let i = this.posHistory.length - 2;
+      i >= 0 && slotIdx < this.charges.length;
+      i--
+    ) {
+      const a = this.posHistory[i]
+      const b = this.posHistory[i + 1]
+      const seg = Math.hypot(b.x - a.x, b.y - a.y)
+      // Big jump = wrap transition. Skip this segment entirely.
+      if (seg > JUMP_THRESHOLD) continue
+      while (slotIdx < this.charges.length && dist + seg >= nextTarget) {
+        const t = (nextTarget - dist) / seg
+        const tx = b.x + (a.x - b.x) * t
+        const ty = b.y + (a.y - b.y) * t
+        const { pos } = this.charges[slotIdx]
+        const snapDist = Math.hypot(tx - pos.x, ty - pos.y)
+        if (snapDist > JUMP_THRESHOLD) {
+          pos.x = tx
+          pos.y = ty
+        } else {
+          pos.x += (tx - pos.x) * 0.2
+          pos.y += (ty - pos.y) * 0.2
+        }
+        this.charges[slotIdx].sprite.setPosition(pos.x, pos.y)
+        slotIdx++
+        nextTarget += spacing
+      }
+      dist += seg
+    }
   }
 
   private isFlip(a: number, b: number): boolean {
@@ -562,6 +696,7 @@ export class PlayerSprite {
     this.glowSprite = this.scene.add
       .sprite(this.x, this.y, 'player', 0)
       .setDepth(6)
+      .setVisible(GLOW_ENABLED)
     this.glow = this.glowSprite
       .enableFilters()
       .filters!.external.addGlow(0xff9900, 0, 0, 1, false, 30, 20)

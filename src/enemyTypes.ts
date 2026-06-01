@@ -29,7 +29,7 @@ export const ENEMY_TYPES: Record<EnemyType, EnemyConfig> = {
     aiType: 2,
     frameRate: 2,
     easeOut: true,
-    canReverse: true,
+    canReverse: false,
     swimTrailInterval: 150,
     roundedCorners: true,
   },
