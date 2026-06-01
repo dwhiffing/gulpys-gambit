@@ -23,30 +23,45 @@ export class Menu extends Scene {
     super('Menu')
   }
 
-  create() {
+  create(data?: { lastLevel?: number }) {
     this.glowSprites = []
     this.createLetterMaze()
 
     const isMobile = this.sys.game.device.input.touch
 
+    if (data?.lastLevel) {
+      const prev = parseInt(localStorage.getItem('topLevel') ?? '0', 10)
+      if (data.lastLevel > prev) {
+        localStorage.setItem('topLevel', String(data.lastLevel))
+      }
+    }
+    const topLevel = parseInt(localStorage.getItem('topLevel') ?? '0', 10)
+
+    const label = topLevel
+      ? `TOP LEVEL: ${topLevel}`
+      : isMobile
+        ? 'TAP TO START'
+        : 'PRESS Z TO START'
+
     const startText = this.add
-      .text(
-        NATIVE_W / 2,
-        NATIVE_H - 90,
-        isMobile ? 'TAP TO START' : 'PRESS Z TO START',
-        { fontFamily: 'monospace', fontSize: '16px', color: '#7294d6' },
-      )
+      .text(NATIVE_W / 2, NATIVE_H - 90, label, {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: '#7294d6',
+      })
       .setOrigin(0.5, 0.5)
       .setDepth(2)
 
-    this.tweens.add({
-      targets: startText,
-      alpha: { from: 0, to: 0.7 },
-      duration: 2000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    })
+    if (!topLevel) {
+      this.tweens.add({
+        targets: startText,
+        alpha: { from: 0, to: 0.7 },
+        duration: 2000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      })
+    }
 
     let transitioning = true
     this.time.delayedCall(1000, () => (transitioning = false))

@@ -265,16 +265,19 @@ export class Game extends Scene {
     if (timeout) this.player.playTimeOutSound()
     this.player.die()
     for (const g of this.ghosts) g.stop()
-    this.time.delayedCall(1000, () =>
-      timeout
-        ? this.scene.launch('Checkerboard', {
-            stopScene: 'Game',
-            nextScene: 'Menu',
-          })
-        : this.scene.launch('Checkerboard', {
-            restartScene: 'Game',
-            restartData: { level: this.level, timeLeft: this.timeLeft },
-          }),
-    )
+    this.time.delayedCall(1000, () => {
+      if (timeout || this.timeLeft - 10 <= 0) {
+        this.scene.launch('Checkerboard', {
+          stopScene: 'Game',
+          nextScene: 'Menu',
+          nextSceneData: { lastLevel: this.level },
+        })
+      } else {
+        this.scene.launch('Checkerboard', {
+          restartScene: 'Game',
+          restartData: { level: this.level, timeLeft: this.timeLeft - 10 },
+        })
+      }
+    })
   }
 }
