@@ -175,6 +175,6 @@ export function updateScrollingBg(
   const t = time * 0.00004
   bg.tilePositionX = wobble(t, [0.6, 1.1, 1.9], [0, 0, 0], 220)
   bg.tilePositionY = wobble(t, [0.8, 1.4, 2.3], [0.9, 0.4, 1.8], 220)
-  bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.1)
-  bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.1)
+  bgDisplacement.x = wobble(t, [0.7, 1.3, 2.1], [0, 0, 0], 0.15)
+  bgDisplacement.y = wobble(t, [0.9, 1.7, 2.5], [1.2, 0.5, 2.0], 0.15)
 }

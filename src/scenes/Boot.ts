@@ -23,7 +23,7 @@ export class Boot extends Scene {
   preload() {
     this.load.setPath('assets')
     this.load.image('background', 'background.png')
-    this.load.image('distort', 'noise.jpg')
+
     this.load.audio('music', 'game-dream.mp3')
     this.load.spritesheet('player', 'player.png', {
       frameWidth: CELL * 2,
@@ -46,6 +46,7 @@ export class Boot extends Scene {
   create() {
     this.createAnimations()
     this.createGlowTextures()
+    this.createNoiseTexture()
 
     const MUTE_KEY = 'gulpy-mute'
     const states = ['all', 'sfx', 'mute'] as const
@@ -80,10 +81,75 @@ export class Boot extends Scene {
       applyState(state)
     })
 
+    // this.scene.start('Game')
     this.scene.launch('Checkerboard', {
       nextScene: 'Menu',
       stopScene: 'Boot',
     })
+  }
+
+  private createNoiseTexture() {
+    const size = 512
+    const canvas = this.textures.createCanvas('distort', size, size)!
+    const ctx = canvas.getContext()
+    const imageData = ctx.createImageData(size, size)
+
+    // Build a grid of random values for each octave
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+    const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
+
+    const smoothNoise = (
+      grid: number[][],
+      gSize: number,
+      x: number,
+      y: number,
+    ) => {
+      const gx = (x / size) * gSize
+      const gy = (y / size) * gSize
+      const x0 = Math.floor(gx) % gSize
+      const y0 = Math.floor(gy) % gSize
+      const x1 = (x0 + 1) % gSize
+      const y1 = (y0 + 1) % gSize
+      const tx = fade(gx - Math.floor(gx))
+      const ty = fade(gy - Math.floor(gy))
+      return lerp(
+        lerp(grid[y0][x0], grid[y0][x1], tx),
+        lerp(grid[y1][x0], grid[y1][x1], tx),
+        ty,
+      )
+    }
+
+    const octaves = [
+      { freq: 2, amp: 0.5 },
+      { freq: 4, amp: 0.25 },
+      { freq: 8, amp: 0.125 },
+      { freq: 16, amp: 0.0625 },
+      { freq: 32, amp: 0.03125 },
+    ]
+
+    const grids = octaves.map(({ freq }) => {
+      return Array.from({ length: freq }, () =>
+        Array.from({ length: freq }, () => Math.random()),
+      )
+    })
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        let v = 0
+        for (let i = 0; i < octaves.length; i++) {
+          v += smoothNoise(grids[i], octaves[i].freq, x, y) * octaves[i].amp
+        }
+        const c = Math.round(v * 255)
+        const idx = (y * size + x) * 4
+        imageData.data[idx] = c
+        imageData.data[idx + 1] = c
+        imageData.data[idx + 2] = c
+        imageData.data[idx + 3] = 255
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0)
+    canvas.refresh()
   }
 
   private createGlowTextures() {
