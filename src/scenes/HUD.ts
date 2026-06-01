@@ -28,7 +28,12 @@ export class HUD extends Scene {
 
   update() {
     const game = this.scene.get('Game') as Game
-    if (!game?.maze) return
+    if (!game?.maze || !this.scene.isActive('Game')) {
+      this.track.setVisible(false)
+      this.bar.setVisible(false)
+      this.bonusBar.setVisible(false)
+      return
+    }
 
     const actual = Math.max(0, game.timeLeft)
     // Only lerp upward (dot pickups); let countdown track directly so it doesn't lag behind
@@ -41,6 +46,9 @@ export class HUD extends Scene {
     const mazeW = game.maze.cols * CELL * game.gameScale
     const barX = NATIVE_W / 2 - mazeW / 2
     const barY = NATIVE_H - BAR_H
+
+    this.track.setVisible(true)
+    this.bar.setVisible(true)
 
     const t = this.displayTime
 
