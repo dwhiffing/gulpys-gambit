@@ -1,7 +1,15 @@
 import type { Types } from 'phaser'
 import * as Phaser from 'phaser'
 import { Scene } from 'phaser'
-import { CELL, TILES, TIMER_BASE, TIMER_MAX, TIMER_PER_DOT, TIMESCALE } from '../constants'
+import {
+  CELL,
+  DEBUG_SKIP_LEVEL,
+  TILES,
+  TIMER_BASE,
+  TIMER_MAX,
+  TIMER_PER_DOT,
+  TIMESCALE,
+} from '../constants'
 import { Maze } from '../maze'
 import { getMazeConfig } from '../mazeConfig'
 import { GhostSprite } from '../sprites/GhostSprite'
@@ -29,6 +37,21 @@ export class Game extends Scene {
 
   create(data?: { level?: number; timeLeft?: number }) {
     this.cursors = this.input.keyboard!.createCursorKeys()
+    this.input.keyboard!.on('keydown-N', () => {
+      if (!DEBUG_SKIP_LEVEL) return
+      if (this.gameState !== 'playing') return
+      this.gameState = 'won'
+      this.maze.hideAllGlows()
+      this.player.playBeatLevelSound()
+      for (const g of this.ghosts) g.stop()
+      this.scene.launch('Checkerboard', {
+        restartScene: 'Game',
+        restartData: {
+          level: this.level + 1,
+          timeLeft: Math.min(TIMER_MAX, this.timeLeft + 15),
+        },
+      })
+    })
     this.gameState = 'playing'
     this.timeLeft = data?.timeLeft ?? TIMER_BASE
 
