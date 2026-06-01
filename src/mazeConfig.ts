@@ -40,7 +40,10 @@ export interface MazeConfig {
 const MIN_SIZE = 16
 const MAX_SIZE = 35
 export const getMazeConfig = (level: number): MazeConfig => {
-  const S = Math.min(MAX_SIZE, Math.max(MIN_SIZE, 16 + (level - 1) * 2))
+  const S = Math.min(
+    MAX_SIZE,
+    Math.max(MIN_SIZE, Math.floor(16 + (level - 2) * 1.5)),
+  )
   const wraps = Math.floor(S / 15)
   return {
     cols: S,
@@ -49,11 +52,11 @@ export const getMazeConfig = (level: number): MazeConfig => {
     loopFactor: 0.2,
     wraps: { x: wraps, y: wraps - 1 },
     ghosts: {
-      // teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
-      // naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
-      // oct: level <= 7 ? 0 : 1,
+      teeth2: level <= 2 ? 1 : level <= 5 ? 2 : level <= 7 ? 2 : 3,
+      naut: level <= 5 ? 0 : level <= 7 ? 1 : 2,
+      oct: level <= 7 ? 0 : 1,
     },
-    powerCount: 10 + level,
+    powerCount: 4 + level,
   }
 }
 
